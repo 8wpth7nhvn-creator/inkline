@@ -39,21 +39,22 @@
   ];
 
   // Font pairs visitors can choose. 'default' keeps each design's own fonts.
-  // `css` is the Google Fonts family query, loaded only when someone picks that pair.
+  // `css` names the stylesheet in assets/fonts, loaded only when someone picks that pair ('' = already loaded).
   const FONTS = [
     { id: 'default',      name: 'Design default', head: '', body: '', css: '' },
-    { id: 'modern',       name: 'Modern',       head: "'Hanken Grotesk',Arial,sans-serif", body: "'Hanken Grotesk',Arial,sans-serif", css: 'Hanken+Grotesk:wght@400;500;600;700' },
-    { id: 'classic',      name: 'Classic serif', head: "'Newsreader',Georgia,serif", body: "'Newsreader',Georgia,serif", css: 'Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600' },
-    { id: 'elegant',      name: 'Elegant',      head: "'Playfair Display',Georgia,serif", body: "'Lato',Arial,sans-serif", css: 'Playfair+Display:wght@500;600;700&family=Lato:wght@400;700' },
-    { id: 'bold',         name: 'Bold',         head: "'Montserrat',Arial,sans-serif", body: "'Open Sans',Arial,sans-serif", css: 'Montserrat:wght@500;600;700&family=Open+Sans:wght@400;600' },
-    { id: 'friendly',     name: 'Friendly',     head: "'Nunito',Arial,sans-serif", body: "'Nunito',Arial,sans-serif", css: 'Nunito:wght@400;600;700' },
-    { id: 'professional', name: 'Professional', head: "'Merriweather',Georgia,serif", body: "'Source Sans 3',Arial,sans-serif", css: 'Merriweather:wght@400;700&family=Source+Sans+3:wght@400;600' },
-    { id: 'minimal',      name: 'Minimal',      head: "'DM Sans',Arial,sans-serif", body: "'DM Sans',Arial,sans-serif", css: 'DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700' }
+    { id: 'modern',       name: 'Modern',       head: "'Hanken Grotesk',Arial,sans-serif", body: "'Hanken Grotesk',Arial,sans-serif", css: '' },
+    { id: 'classic',      name: 'Classic serif', head: "'Newsreader',Georgia,serif", body: "'Newsreader',Georgia,serif", css: '' },
+    { id: 'elegant',      name: 'Elegant',      head: "'Playfair Display',Georgia,serif", body: "'Lato',Arial,sans-serif", css: 'elegant' },
+    { id: 'bold',         name: 'Bold',         head: "'Montserrat',Arial,sans-serif", body: "'Open Sans',Arial,sans-serif", css: 'bold' },
+    { id: 'friendly',     name: 'Friendly',     head: "'Nunito',Arial,sans-serif", body: "'Nunito',Arial,sans-serif", css: 'friendly' },
+    { id: 'professional', name: 'Professional', head: "'Merriweather',Georgia,serif", body: "'Source Sans 3',Arial,sans-serif", css: 'professional' },
+    { id: 'minimal',      name: 'Minimal',      head: "'DM Sans',Arial,sans-serif", body: "'DM Sans',Arial,sans-serif", css: 'minimal' }
   ];
   function fontById(id) { return FONTS.find(f => f.id === id) || FONTS[0]; }
+  // Font files are served from this site (assets/fonts), so visitors never connect to Google.
   function fontHref(id) {
     const f = fontById(id);
-    return f.css ? `https://fonts.googleapis.com/css2?family=${f.css}&display=swap` : '';
+    return f.css ? `assets/fonts/${f.css}.css` : '';
   }
 
   function emptyCV() {

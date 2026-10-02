@@ -9,8 +9,11 @@
   const STORE = 'inkline:v1';
   const API = 'api/ai.php';
   const STAGES = ['basics', 'target', 'contact', 'experience', 'education', 'skills', 'extras', 'review'];
-  const AI_OPENER = '(The visitor has just opened Inkline and is ready to start.)';
   const mobile = () => matchMedia('(max-width:980px)').matches;
+
+  // A photo is only ever a picture we drew ourselves (a JPEG data URL). Anything else is refused,
+  // so nothing unexpected can ever be put into the page.
+  const safePhoto = p => typeof p === 'string' && p.length < 3000000 && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(p);
 
   // ---------- state ----------
   const params = new URLSearchParams(location.search);
@@ -23,7 +26,7 @@
       started: false,
       pane: 'chat',          // 'chat' or 'form'
       mode: null,            // in the chat: 'ai' or 'guided'
-      history: [],           // exact messages sent to the AI, append-only
+      conversation: null,    // id of this visitor's chat on the server (the history itself stays there)
       chat: [],              // what the visitor sees: {who, text}
       quick: [],
       stage: 'basics',
@@ -38,7 +41,9 @@
         s.cv = normalize(s.cv);
         if (templateById(s.template).id !== s.template) s.template = 'atlas';
         if (!ACCENTS.some(a => a.id === s.accent)) s.accent = templateById(s.template).accent;
-        if (typeof s.photo !== 'string') s.photo = '';
+        if (!safePhoto(s.photo)) s.photo = '';
+        delete s.history;   // older versions kept the chat history in the browser
+        if (typeof s.conversation !== 'string') s.conversation = null;
         if (s.started === undefined) s.started = !!(s.chat && s.chat.length);
         if (!s.pane) s.pane = 'chat';
         if (fontById(s.font).id !== s.font) s.font = 'default';
@@ -161,7 +166,9 @@
       ctx.imageSmoothingQuality = 'high';
       ctx.drawImage(img, sx, sy, s, s, 0, 0, size, size);
       URL.revokeObjectURL(url);
-      state.photo = c.toDataURL('image/jpeg', 0.86);
+      const url = c.toDataURL('image/jpeg', 0.86);
+      if (!safePhoto(url)) { toast("That photo couldn't be used. Try another one."); return; }
+      state.photo = url;
       save();
       renderCV(true);
       syncPhotoUI();
@@ -178,7 +185,7 @@
     if (state.pane === 'form') buildForm();
   }
   function syncPhotoUI() {
-    $('#photo-mini').innerHTML = state.photo ? `<img src="${state.photo}" alt="">` : ICONS.camera;
+    $('#photo-mini').innerHTML = safePhoto(state.photo) ? `<img src="${state.photo}" alt="">` : ICONS.camera;
     $('#photo-label').textContent = state.photo ? 'Change photo' : 'Add photo';
   }
   $('#photo-btn').addEventListener('click', pickPhoto);
@@ -283,7 +290,8 @@
     setTimeout(() => { b.textContent = 'Copy as text'; }, 1800);
   });
   $('#restart').addEventListener('click', () => {
-    if (!confirm('Start a new CV? This clears your CV, photo and chat from this browser.')) return;
+    if (!confirm('Start a new CV? This deletes your CV, photo and chat from this browser, and the chat from our server.')) return;
+    if (state.conversation) api({ action: 'end', conversation: state.conversation });
     try { localStorage.removeItem(STORE); } catch (e) { /* nothing stored */ }
     const keep = { template: state.template, accent: state.accent, paper: state.paper, font: state.font, sizes: state.sizes };
     state = Object.assign(fresh(), keep);
@@ -446,7 +454,7 @@
         <h2>Photo</h2>
         <p class="sub">Shows in designs with a photo spot. It stays in your browser and is never sent to the AI.</p>
         <div class="photo-row">
-          <div class="avatar">${state.photo ? `<img src="${state.photo}" alt="Your photo">` : ICONS.camera}</div>
+          <div class="avatar">${safePhoto(state.photo) ? `<img src="${state.photo}" alt="Your photo">` : ICONS.camera}</div>
           <div class="photo-btns">
             <button type="button" class="ghost" data-act="photo">${state.photo ? 'Change photo' : 'Upload a photo'}</button>
             ${state.photo ? '<button type="button" class="ghost" data-act="photo-remove">Remove</button>' : ''}
@@ -708,6 +716,27 @@
   function setBusy(on) { busy = on; sendBtn.disabled = on; typing(on); }
 
   // ---------- AI interviewer ----------
+  // Every request goes to our own server (never straight to an AI company), with a header that
+  // the server requires. The server's messages are plain text and shown as text, never as HTML.
+  async function api(body) {
+    try {
+      const r = await fetch(API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Inkline-Client': '1' },
+        body: JSON.stringify(body),
+        credentials: 'same-origin'
+      });
+      const j = await r.json().catch(() => null);
+      return j && typeof j === 'object' ? Object.assign({ status: r.status }, j) : { ok: false, status: r.status, error: 'network' };
+    } catch (e) { return { ok: false, status: 0, error: 'network' }; }
+  }
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  async function startConversation() {
+    const begun = !!(state.cv.name || state.cv.experience.length);
+    const res = await api({ action: 'start', cv: begun ? state.cv : undefined });
+    if (res.ok) { state.conversation = res.conversation; state.edited = false; save(); }
+    return res;
+  }
   async function aiAvailable() {
     try {
       const r = await fetch(API + '?status', { cache: 'no-store' });
@@ -719,25 +748,20 @@
 
   let failures = 0;
   async function aiTurn(text) {
-    let content = text;
-    if (state.edited) {
-      content = 'Note: I edited my CV directly. This is the current version:\n' + JSON.stringify(state.cv) + '\n\nMy answer: ' + text;
-    }
-    state.history.push({ role: 'user', content });
     setBusy(true);
-    let res = null;
-    try {
-      const r = await fetch(API, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: state.history })
-      });
-      res = await r.json().catch(() => null);
-    } catch (e) { res = null; }
+    const body = { action: 'chat', conversation: state.conversation, input: text };
+    if (state.edited) body.cv = state.cv;   // the CV is sent only when the visitor changed it by hand
+    let res = await api(body);
+    if (!res.ok && res.error === 'conversation_expired') {
+      // Chats are deleted from the server after a while. Start a fresh one that knows the CV, then retry.
+      const st = await startConversation();
+      if (st.ok) { await sleep(1300); res = await api({ action: 'chat', conversation: state.conversation, input: text, cv: state.cv }); }
+      else res = st;
+    }
     setBusy(false);
 
-    if (res && res.ok && res.data) {
+    if (res.ok && res.data) {
       failures = 0;
-      state.history.push({ role: 'assistant', content: res.content });
       state.edited = false;
       const d = res.data;
       state.cv = normalize(d.cv);
@@ -749,32 +773,36 @@
       save();
       return;
     }
-    // The turn failed: take the unanswered message back out so the history stays clean.
-    state.history.pop();
     failures++;
-    save();
-    const busyMsg = res && res.error === 'busy'
-      ? 'Lots of people are making CVs right now, so I need a short break.'
-      : "Sorry, I couldn't reach the AI just now.";
-    const el = bubble('ai', busyMsg + ' Your answers are safe.', false);
+    const limited = res.error === 'daily_limit' || res.error === 'turn_limit';
+    const msg = res.message || "Sorry, I couldn't reach the AI just now.";
+    const el = bubble('ai', limited ? msg : msg + ' Your answers are safe.', false);
     const row = document.createElement('div');
     row.className = 'retry';
-    const again = document.createElement('button');
-    again.type = 'button'; again.className = 'chip'; again.textContent = 'Try again';
-    again.addEventListener('click', () => {
-      if (el.label) el.label.remove();
-      el.remove();
-      const mine = log.querySelectorAll('.msg.me');
-      if (mine.length) mine[mine.length - 1].remove();
-      state.chat.pop();
-      submit(text);
-    });
-    row.appendChild(again);
-    if (failures >= 2) {
+    if (!limited) {
+      const again = document.createElement('button');
+      again.type = 'button'; again.className = 'chip'; again.textContent = 'Try again';
+      const wait = Math.min(60, Number(res.retry_after) || 0);
+      if (wait > 0) { again.disabled = true; setTimeout(() => { again.disabled = false; }, wait * 1000); }
+      again.addEventListener('click', () => {
+        if (el.label) el.label.remove();
+        el.remove();
+        const mine = log.querySelectorAll('.msg.me');
+        if (mine.length) mine[mine.length - 1].remove();
+        state.chat.pop();
+        submit(text);
+      });
+      row.appendChild(again);
+    }
+    if (limited || failures >= 2) {
       const guided = document.createElement('button');
       guided.type = 'button'; guided.className = 'chip'; guided.textContent = 'Continue without AI';
       guided.addEventListener('click', () => { row.remove(); switchToGuided(); });
       row.appendChild(guided);
+      const form = document.createElement('button');
+      form.type = 'button'; form.className = 'chip'; form.textContent = 'Edit it myself';
+      form.addEventListener('click', () => setPane('form'));
+      row.appendChild(form);
     }
     el.appendChild(row);
   }
@@ -1008,7 +1036,7 @@
   }
   // Text from the many document formats people keep CVs in.
   async function odtText(file) {
-    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
+    await loadScript('assets/vendor/jszip.min.js');
     const zip = await window.JSZip.loadAsync(await file.arrayBuffer());
     const xml = await zip.file('content.xml').async('string');
     return decodeXmlText(xml.replace(/<\/text:(p|h)>/g, '\n').replace(/<text:tab\/>/g, '\t').replace(/<text:line-break\/>/g, '\n'));
@@ -1065,7 +1093,7 @@
 
   // Apple Pages files are zip packages with a preview of the document inside.
   async function pagesPreview(file) {
-    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
+    await loadScript('assets/vendor/jszip.min.js');
     const zip = await window.JSZip.loadAsync(await file.arrayBuffer());
     const names = Object.keys(zip.files);
     const pdf = names.find(n => /preview\.pdf$/i.test(n));
@@ -1110,7 +1138,7 @@
     });
   }
   async function docxText(file) {
-    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
+    await loadScript('assets/vendor/jszip.min.js');
     const zip = await window.JSZip.loadAsync(await file.arrayBuffer());
     const xml = await zip.file('word/document.xml').async('string');
     const t = xml.replace(/<\/w:p>/g, '\n').replace(/<w:tab\/>/g, '\t').replace(/<w:br\/>/g, '\n').replace(/<[^>]+>/g, '');
@@ -1119,10 +1147,11 @@
     return d.value.replace(/\n{3,}/g, '\n\n').trim();
   }
   async function pdfText(file) {
-    const base = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/';
+    // Served from this site (not a CDN), so no outside server can ever change the code that runs here.
+    const base = new URL('assets/vendor/', location.href).href;
     const pdfjs = await import(base + 'pdf.min.mjs');
     pdfjs.GlobalWorkerOptions.workerSrc = base + 'pdf.worker.min.mjs';
-    const doc = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
+    const doc = await pdfjs.getDocument({ data: await file.arrayBuffer(), isEvalSupported: false }).promise;
     let out = '';
     for (let n = 1; n <= Math.min(doc.numPages, 6); n++) {
       const tc = await (await doc.getPage(n)).getTextContent();
@@ -1169,33 +1198,31 @@
       if (!payload.files.length) delete payload.files;
       if (!payload.text.trim()) delete payload.text;
       if (!payload.files && !payload.text) throw new Error('empty');
+      // The server enforces these limits; checking here too just saves a wasted upload.
+      const bytes = (payload.files || []).reduce((n, f) => n + f.data.length * 0.75, 0);
+      if ((payload.files || []).some(f => f.data.length * 0.75 > 8 * 1048576)) throw new Error('size');
+      if (bytes > 10 * 1048576) throw new Error('size');
     } catch (e) {
       setBusy(false);
       bubble('ai', /pages/.test(e && e.message)
         ? "I couldn't find anything readable inside that Pages file. In Pages, choose File, then Export To, then PDF, and upload the PDF."
-        : "I couldn't open that file. If it's a photo, try a JPG or PNG. If it's a document, try saving it as a PDF and uploading that.");
+        : /size/.test(e && e.message)
+          ? 'That file is too big. Each file can be up to 8 MB, and 10 MB together.'
+          : "I couldn't open that file. If it's a photo, try a JPG or PNG. If it's a document, try saving it as a PDF and uploading that.");
       return;
     }
-    let res = null;
-    try {
-      const r = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ action: 'import' }, payload)) });
-      res = await r.json().catch(() => null);
-    } catch (e) { res = null; }
+    const res = await api(Object.assign({ action: 'import', conversation: state.conversation || undefined }, payload));
     setBusy(false);
-    if (!res || !res.ok || !res.data) {
-      bubble('ai', res && res.error === 'busy'
-        ? 'Lots of people are using Inkline right now. Please try the upload again in a minute.'
-        : "Sorry, I couldn't read that file just now. You can try again, or just tell me about your experience instead.");
-      setQuick([{ label: 'Try the upload again', act: 'upload' }]);
+    if (!res.ok || !res.data) {
+      bubble('ai', res.message || "Sorry, I couldn't read that file just now. You can try again, or just tell me about your experience instead.");
+      if (res.error !== 'daily_limit') setQuick([{ label: 'Try the upload again', act: 'upload' }]);
       return;
     }
+    // The server keeps the interview going from what it read; the file itself is never stored.
+    if (res.conversation) state.conversation = res.conversation;
     const d = res.data;
     state.cv = normalize(d.cv);
     renderCV(true);
-    // Record the upload in the interview as an ordinary exchange, without the file itself,
-    // so every later turn knows the starting draft without sending the file again.
-    state.history.push({ role: 'user', content: 'I uploaded my old CV. These are the details found in it:\n' + JSON.stringify(state.cv) });
-    state.history.push({ role: 'assistant', content: JSON.stringify({ reply: d.reply, quick_replies: d.quick_replies || [], stage: 'review', show_designs: false, suggested_templates: [], cv: state.cv }) });
     state.edited = false;
     bubble('ai', String(d.reply || '').trim() || "I've read your old CV and filled in your new one. What has changed since you wrote it?");
     if (firstPageOnly) bubble('ai', 'Note: that Pages file only let me see its first page. If your CV is longer, export it from Pages as a PDF and upload that too.');
@@ -1294,15 +1321,20 @@
       ? `Hi ${first || 'there'}. I can see you've started your CV. I'll ask about anything that's missing, and you can skip whatever you like.`
       : "Hi, I'm your Inkline interviewer. I'll ask a few easy questions and write your CV as we go. You can skip anything, ask me questions any time, or upload your old CV with the paperclip.\n\nFirst, what's your full name?";
     if (ai) {
-      state.history = [
-        { role: 'user', content: AI_OPENER },
-        { role: 'assistant', content: JSON.stringify({ reply: greeting, quick_replies: [], stage: 'basics', cv: emptyCV() }) }
-      ];
-      if (begun) state.edited = true;
-      setStage('basics');
-      bubble('ai', begun ? greeting + '\n\nWhat would you like to do first?' : greeting);
-      setQuick(begun ? ['Fill in the gaps', 'Make my wording stronger', 'Add a job'] : []);
-    } else {
+      const res = await startConversation();
+      if (res.ok) {
+        setStage('basics');
+        bubble('ai', res.greeting || greeting);
+        setQuick(Array.isArray(res.quick_replies) ? res.quick_replies : []);
+        save();
+        if (!mobile()) answer.focus({ preventScroll: true });
+        return;
+      }
+      // Could not open an AI chat (for example the daily limit): carry on with the guided questions.
+      setMode('guided');
+      if (res.message) bubble('ai', res.message);
+    }
+    if (state.mode === 'guided') {
       bubble('ai', greeting);
       if (begun) {
         state.guided = { step: firstMissingStep(), expIndex: c.experience.length - 1, eduIndex: c.education.length - 1 };

@@ -1,0 +1,35 @@
+# Inkline security settings for Apache/LiteSpeed hosting (for example Hostinger).
+# GitHub Pages ignores this file; it applies once the site is on a PHP host.
+
+Options -Indexes
+AddType text/javascript .mjs
+AddType font/woff2 .woff2
+
+# Never serve hidden files (.env, .git, .htaccess) or server-only files.
+<FilesMatch "^\.">
+  Require all denied
+</FilesMatch>
+<FilesMatch "^(dev-router\.php|README\.md)$">
+  Require all denied
+</FilesMatch>
+RedirectMatch 404 /\.(?!well-known/)
+RedirectMatch 404 /inkline-data(/|$)
+
+# Always use HTTPS.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{HTTPS} off
+  RewriteCond %{HTTP:X-Forwarded-Proto} !https
+  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+</IfModule>
+
+# Security headers for every page.
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "DENY"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+  Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+  Header always set Cross-Origin-Opener-Policy "same-origin"
+  Header always set Content-Security-Policy "frame-ancestors 'none'"
+</IfModule>

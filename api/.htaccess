@@ -1,5 +1,6 @@
-# Visitors may call ai.php, nothing else in this folder.
+# Visitors may call ai.php, nothing else in this folder (lib/ and tools/ are server-only).
 <FilesMatch "^(?!ai\.php$).*$">
   Require all denied
 </FilesMatch>
+RedirectMatch 404 /api/(lib|tools)/
 Options -Indexes

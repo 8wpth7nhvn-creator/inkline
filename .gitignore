@@ -1,3 +1,13 @@
-# Your Claude API key lives here. Never commit it.
+# Secrets: API keys and settings live here. Never commit them.
+.env
+.env.*
+!.env.example
 api/config.php
+*.key
+*.pem
+
+# Server data (rate limits, chats, logs) is created outside the site folder, but just in case:
+inkline-data/
+*.log
+
 .DS_Store
