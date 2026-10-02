@@ -1,0 +1,5 @@
+# Visitors may call ai.php, nothing else in this folder.
+<FilesMatch "^(?!ai\.php$).*$">
+  Require all denied
+</FilesMatch>
+Options -Indexes

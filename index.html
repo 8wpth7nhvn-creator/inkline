@@ -1,0 +1,992 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inkline · The AI CV maker that asks the right questions</title>
+<meta name="description" content="Make your CV with AI, or fill in a beautiful template yourself. Add your photo, pick from 11 designs and download your PDF free. No card, no watermark.">
+<meta name="theme-color" content="#E6EEF5">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath d='M32 6C32 6 14 28 14 40a18 18 0 0 0 36 0C50 28 32 6 32 6z' fill='%2310123F'/%3E%3Ccircle cx='40' cy='44' r='5' fill='%23C43D25'/%3E%3C/svg%3E">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Inkline · The AI CV maker that asks the right questions">
+<meta property="og:description" content="Answer a few easy questions. The AI writes your CV. Download it free, with no card and no watermark.">
+<!-- DEPLOY STEP: these two URLs must be the live absolute address. Set for GitHub Pages; change them if the site moves. -->
+<meta property="og:image" content="https://8wpth7nhvn-creator.github.io/inkline/assets/hero-ending.jpg">
+<meta property="og:url" content="https://8wpth7nhvn-creator.github.io/inkline/">
+<script>document.documentElement.classList.add('js')</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gloock&family=Hanken+Grotesk:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Spline+Sans+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/cv.css">
+<style>
+:root{
+  --canvas:#E6EEF5; --panel:#F4F7FB; --ink:#030327; --ink-2:#0B0C3A;
+  --text:#10123F; --text-2:#4A5279; --violet:#4C51B8; --violet-soft:#6B70D0;
+  --on-ink:#E9EEF8; --on-ink-2:#9AA6D6;
+  --accent:#C43D25; --accent-hover:#A93220; --accent-muted:rgba(196,61,37,.18);
+  --line:rgba(16,18,63,.12); --line-strong:#6F78A8; --line-ink:rgba(154,166,214,.22);
+  --ease:cubic-bezier(.22,.61,.36,1); --ease-out:cubic-bezier(.16,1,.3,1);
+  --display:'Gloock',Georgia,serif; --body:'Hanken Grotesk',system-ui,sans-serif; --mono:'Spline Sans Mono',ui-monospace,monospace;
+  --tglow:0 1px 1px rgba(255,255,255,.55),0 0 18px rgba(236,242,248,.9),0 0 46px rgba(236,242,248,.75);
+  --gutter:clamp(20px,4vw,48px);
+}
+*{box-sizing:border-box}
+html{overflow-x:hidden;overflow-x:clip;scroll-padding-top:90px}
+body{margin:0;overflow-x:hidden;overflow-x:clip;background:var(--canvas);color:var(--text);font:17px/1.6 var(--body);-webkit-font-smoothing:antialiased;animation:pageIn .8s var(--ease-out) both}
+@keyframes pageIn{from{opacity:0}to{opacity:1}}
+h1,h2,h3,p{margin:0}
+a{color:inherit}
+img{display:block;max-width:100%}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:6px}
+main:focus,section[tabindex="-1"]:focus{outline:none}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.skip{position:fixed;left:14px;top:-70px;z-index:100;background:var(--text);color:#fff;padding:10px 14px;border-radius:10px;text-decoration:none;transition:top .25s var(--ease)}
+.skip:focus{top:14px}
+.wrap{max-width:1180px;margin:0 auto;padding:0 var(--gutter)}
+.kicker{font:500 12px/1.2 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--violet)}
+.on-ink .kicker{color:var(--on-ink-2)}
+.h2{font:400 clamp(38px,5vw,68px)/1.04 var(--display);letter-spacing:-.012em;max-width:16ch}
+.lede{font-size:clamp(17px,1.4vw,19px);color:var(--text-2);max-width:52ch}
+.on-ink .lede{color:var(--on-ink-2)}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;border:0;border-radius:99px;padding:15px 26px;background:var(--accent);color:#fff;font-weight:600;font-size:16px;text-decoration:none;position:relative;isolation:isolate;transition:background-color .3s var(--ease),transform .3s var(--ease-out)}
+.btn::after{content:"";position:absolute;inset:0;border-radius:inherit;z-index:-1;box-shadow:0 10px 30px -8px rgba(196,61,37,.75);opacity:.55;transition:opacity .3s var(--ease)}
+.btn:hover{background:var(--accent-hover);transform:translateY(-2px)}
+.btn:hover::after{opacity:1}
+.btn .seal{width:9px;height:9px;border-radius:50%;background:#fff;opacity:.9}
+.link{display:inline-flex;align-items:center;gap:8px;padding:14px 8px;font-weight:600;text-decoration:none;border-bottom:1px solid transparent;transition:border-color .3s var(--ease)}
+.link:hover{border-color:currentColor}
+@media (pointer:coarse){.btn,.link,.nav a{min-height:44px;display:inline-flex;align-items:center;justify-content:center}}
+
+/* one environment behind the whole page: slow drifting ink haze and paper grain */
+.env{position:fixed;inset:0;z-index:-2;pointer-events:none;overflow:hidden}
+.env i{position:absolute;width:70vmax;height:70vmax;border-radius:50%;filter:blur(60px);opacity:.5;will-change:transform}
+.env i:nth-child(1){left:-20vmax;top:-25vmax;background:radial-gradient(circle,rgba(107,112,208,.22),transparent 65%);animation:drift1 90s var(--ease) infinite alternate;animation-delay:-20s}
+.env i:nth-child(2){right:-25vmax;bottom:-30vmax;background:radial-gradient(circle,rgba(76,81,184,.18),transparent 65%);animation:drift2 110s var(--ease) infinite alternate;animation-delay:-45s}
+.env::after{content:"";position:absolute;inset:-50%;opacity:.07;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+@keyframes drift1{to{transform:translate(18vmax,14vmax) scale(1.1)}}
+@keyframes drift2{to{transform:translate(-16vmax,-12vmax) scale(1.08)}}
+
+/* nav */
+.nav{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:40;display:flex;align-items:center;gap:6px;padding:7px 7px 7px 18px;border-radius:99px;background:rgba(244,247,251,.7);backdrop-filter:blur(14px) saturate(1.3);-webkit-backdrop-filter:blur(14px) saturate(1.3);border:1px solid rgba(16,18,63,.08);box-shadow:0 8px 30px -14px rgba(16,18,63,.35);width:max-content;max-width:calc(100vw - 24px)}
+.brand{display:flex;align-items:center;gap:8px;margin-right:14px;text-decoration:none;font:22px/1 var(--display);color:var(--text)}
+.brand svg{width:18px;height:18px}
+.nav a.nl{padding:9px 12px;border-radius:99px;font-size:14.5px;font-weight:500;text-decoration:none;color:var(--text-2);transition:color .25s var(--ease),background-color .25s var(--ease)}
+.nav a.nl:hover{color:var(--text);background:rgba(16,18,63,.05)}
+.nav .btn{padding:10px 18px;font-size:14.5px;margin-left:6px}
+@media (max-width:760px){.nav a.nl{display:none}.nav{left:12px;right:12px;transform:none;width:auto;justify-content:space-between}}
+
+/* ---------- hero: the scroll-scrubbed ink ---------- */
+.hero{position:relative;height:560vh}
+.stage{position:sticky;top:0;height:100vh;height:100svh;overflow:hidden;background:#D3E5F5}
+.poster,.stage canvas{position:absolute;inset:0;width:100%;height:100%;background-size:cover;background-position:center}
+.stage canvas{display:block;opacity:0;transition:opacity .8s var(--ease);transform:translateZ(0);will-change:transform}
+.stage.ready canvas{opacity:1}
+.poster,.stage canvas{animation:breatheIn 18s var(--ease) infinite alternate;animation-delay:-4s}
+@keyframes breatheIn{from{transform:translateZ(0) scale(1)}to{transform:translateZ(0) scale(1.045)}}
+.stage.frames-failed canvas{display:none}
+.wash{position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(230,238,245,.55) 0%,rgba(230,238,245,0) 22%)}
+.deep{position:absolute;left:0;right:0;bottom:-1px;height:34%;pointer-events:none;opacity:var(--deep,0);background:linear-gradient(180deg,rgba(3,3,39,0) 0%,rgba(3,3,39,.55) 45%,var(--ink) 96%)}
+.band{position:absolute;opacity:0;--k:0;text-shadow:var(--tglow);will-change:opacity}
+.band.off{visibility:hidden}
+.band::before{content:"";position:absolute;inset:-22% -18%;z-index:-1;pointer-events:none;opacity:calc(.3 + .7*var(--k,1));background:radial-gradient(ellipse 60% 56% at 50% 50%,rgba(236,242,249,.8) 0%,rgba(236,242,249,.5) 48%,rgba(236,242,249,0) 76%)}
+.band .btn,.band .link{text-shadow:none}
+.band-l{left:max(5vw,24px);top:50%;translate:0 -50%;width:min(31vw,470px)}
+.band-r{right:max(5vw,24px);top:50%;translate:0 -50%;width:min(31vw,470px)}
+.band-c{left:50%;top:15vh;translate:-50% 0;width:min(78vw,880px);text-align:center}
+.bh{font:400 clamp(40px,4.7vw,80px)/1.02 var(--display);letter-spacing:-.015em;color:var(--text)}
+.band-c .bh{font-size:clamp(46px,6.4vw,104px)}
+.bs{margin-top:18px;font-size:clamp(17px,1.35vw,20px);font-weight:500;line-height:1.5;color:var(--text);opacity:var(--ks,1);max-width:36ch}
+.band-c .bs{margin-left:auto;margin-right:auto;max-width:44ch}
+.bk{margin-bottom:16px;opacity:var(--kk,1);color:#2A2E86}
+.cta-row{margin-top:28px;display:flex;gap:14px;justify-content:center;align-items:center;flex-wrap:wrap;opacity:var(--kb,1);transform:translateY(calc((1 - var(--kb,1))*14px))}
+
+/* split text */
+.w{display:inline-block;white-space:nowrap}
+.c{display:inline-block}
+/* band 1: words drift down like the falling drop */
+.b1 .w{--kc:clamp(0,(var(--k,0) - var(--th,0))*2.8,1);opacity:var(--kc);transform:translateY(calc((1 - var(--kc))*-26px))}
+.b1{--ks:clamp(0,(var(--k,0) - .45)*3,1);--kk:clamp(0,var(--k,0)*3,1)}
+/* band 2: blur to sharp, the bloom arriving softly */
+.soft-wrap{position:relative;display:block}
+.soft-wrap .soft{position:absolute;inset:0;filter:blur(10px);opacity:calc(1 - var(--k,0));transform:scale(calc(1.04 - .04*var(--k,0)))}
+.soft-wrap .sharp{opacity:var(--k,0)}
+.b2{--ks:clamp(0,(var(--k,0) - .5)*3,1)}
+/* band 3: characters gather like ink clouds */
+.b3 .c{--kc:clamp(0,(var(--k,0) - var(--th,0))*2.6,1);opacity:var(--kc);transform:translate(calc((1 - var(--kc))*var(--jx,0px)),calc((1 - var(--kc))*var(--jy,0px))) rotate(calc((1 - var(--kc))*var(--jr,0deg)))}
+.b3{--ks:clamp(0,(var(--k,0) - .6)*3,1)}
+/* band 4: words settle down into place, then the line, then the buttons */
+.b4 .w{--kc:clamp(0,(var(--k,0) - var(--th,0))*3,1);opacity:var(--kc);transform:translateY(calc((1 - var(--kc))*-34px)) scale(calc(1.06 - .06*var(--kc)))}
+.b4{--kk:clamp(0,(var(--k,0) - .1)*3,1);--ks:clamp(0,(var(--k,0) - .62)*4,1);--kb:clamp(0,(var(--k,0) - .76)*5,1)}
+
+.ring{position:absolute;right:26px;bottom:24px;width:40px;height:40px;color:var(--violet);opacity:.8;transition:opacity .6s var(--ease)}
+.ring circle{transform:rotate(-90deg);transform-origin:50% 50%;transition:stroke-dashoffset .2s linear}
+.stage.loaded .ring{opacity:0}
+.cue{position:absolute;left:50%;bottom:26px;translate:-50% 0;display:flex;flex-direction:column;align-items:center;gap:10px;font:500 11px/1 var(--mono);letter-spacing:.2em;text-transform:uppercase;color:var(--text);transition:opacity .5s var(--ease)}
+.cue::after{content:"";width:1px;height:38px;background:linear-gradient(var(--text),transparent);animation:cue 2.4s var(--ease) infinite;animation-delay:-.6s;transform-origin:top}
+@keyframes cue{0%{transform:scaleY(0);opacity:1}60%{transform:scaleY(1);opacity:1}100%{transform:scaleY(1);opacity:0}}
+.cue.gone{opacity:0}
+.static-copy{display:none}
+@media (max-height:560px){.cue,.ring{display:none}}
+
+/* static hero: phones, portrait tablets, touch portrait, landscape phones, reduced motion */
+@media (max-width: 720px), (orientation: portrait) and (max-width: 1024px), (orientation: portrait) and (pointer: coarse), (orientation: landscape) and (pointer: coarse) and (max-height: 560px), (prefers-reduced-motion: reduce){
+  .hero{height:auto}
+  .stage{position:relative;height:auto;min-height:100svh;display:flex;align-items:flex-end;background:#D3E5F5 url("assets/hero-still.jpg") center 30%/cover no-repeat}
+  .stage canvas,.poster,.band,.ring,.cue,.deep{display:none}
+  .stage::after{content:"";position:absolute;inset:auto 0 0 0;height:56%;background:linear-gradient(180deg,rgba(3,3,39,0) 0%,rgba(3,3,39,.82) 42%,var(--ink) 72%);pointer-events:none}
+  .static-copy{display:flex;flex-direction:column;min-height:100svh;position:relative;z-index:1;width:100%;padding:120px var(--gutter) 56px;color:var(--on-ink)}
+  .static-copy .kicker{color:var(--text);text-shadow:var(--tglow)}
+  .static-copy h1{margin-top:12px;font:400 clamp(44px,12vw,72px)/1.02 var(--display);letter-spacing:-.015em;color:var(--text);text-shadow:var(--tglow);max-width:11ch}
+  .static-copy .sc-body{margin-top:auto;padding-top:40px}
+  .static-copy p{font-size:18px;line-height:1.55;color:var(--on-ink);max-width:34ch;text-shadow:0 1px 14px rgba(3,3,39,.7)}
+  .static-copy .btn{margin-top:24px}
+}
+
+/* on narrow portrait screens the drop moves right of the headline */
+@media (max-width: 720px), (orientation: portrait) and (max-width: 1024px){.stage{background-position:38% 30%}.static-copy h1{max-width:9ch}}
+
+/* ---------- below the hero ---------- */
+main{position:relative}
+.trail{position:absolute;left:0;top:0;width:100%;pointer-events:none;z-index:1;overflow:visible}
+.trail path{fill:none;stroke:var(--violet-soft);stroke-width:1.6;stroke-linecap:round;opacity:.7}
+.trail circle.tip{fill:var(--violet-soft);filter:drop-shadow(0 0 6px rgba(107,112,208,.9))}
+@media (max-width:1100px){.trail{display:none}}
+section{position:relative}
+.on-ink{background:var(--ink);color:var(--on-ink)}
+.pad{padding:clamp(90px,12vw,150px) 0}
+
+/* reveal choreography */
+.js [data-reveal] .r{opacity:0;transform:translateY(22px);transition:opacity .9s var(--ease-out),transform .9s var(--ease-out)}
+[data-reveal].in .r{opacity:1;transform:none}
+[data-reveal].in .r:nth-child(2){transition-delay:.09s}
+[data-reveal].in .r:nth-child(3){transition-delay:.18s}
+[data-reveal].in .r:nth-child(4){transition-delay:.27s}
+[data-reveal].in .r:nth-child(5){transition-delay:.36s}
+[data-reveal].settled .r,[data-reveal].settled .r:nth-child(n){transition-delay:0s}
+
+/* how it works */
+.how{padding-top:clamp(70px,9vw,120px)}
+.how-head{display:grid;grid-template-columns:1.1fr .9fr;gap:40px;align-items:end;margin-bottom:64px}
+.how-head .lede{justify-self:end}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(18px,2.4vw,32px);list-style:none;margin:0;padding:0}
+.step .ph{aspect-ratio:1/1;border-radius:18px;overflow:hidden;position:relative;background:radial-gradient(80% 70% at 50% 35%,#C9DBEC 0%,#8FA8C8 55%,#2B2F8F 100%)}
+.step .ph img{width:100%;height:100%;object-fit:cover;transform:scale(1.02);color:transparent;font-size:0}
+.how.live .step .ph img{animation:breathe 14s var(--ease) infinite alternate}
+.step:nth-child(2) .ph img{animation-delay:-5s!important}
+.step:nth-child(3) .ph img{animation-delay:-9s!important}
+@keyframes breathe{to{transform:scale(1.08)}}
+.step .ph::after{content:"";position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
+.step .num{display:block;margin:22px 0 8px;font:500 12px/1 var(--mono);letter-spacing:.14em;color:var(--on-ink-2)}
+.step h3{font:400 32px/1.1 var(--display)}
+.step p{margin-top:10px;color:var(--on-ink-2);max-width:34ch}
+
+/* try it: hold to rewrite */
+.try-grid{display:grid;grid-template-columns:.95fr 1.05fr;gap:clamp(40px,6vw,90px);align-items:center}
+.try-copy .h2{margin-top:16px}
+.try-copy .lede{margin-top:20px}
+.note{margin-top:26px;display:flex;gap:12px;align-items:flex-start;font-size:15px;color:var(--text-2);max-width:46ch}
+.note::before{content:"";flex:none;margin-top:7px;width:8px;height:8px;border-radius:50%;background:var(--violet)}
+.paper{position:relative;background:#fff;border-radius:18px;padding:34px 36px 30px;box-shadow:0 1px 2px rgba(16,18,63,.05),0 40px 80px -40px rgba(16,18,63,.4);--p:0}
+.paper .ctx{font:500 12px/1.3 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--text-2)}
+.lines{position:relative;margin-top:16px;min-height:5.6em}
+.line{font:400 clamp(22px,2.3vw,30px)/1.3 var(--display);letter-spacing:-.005em}
+.line.before{position:absolute;inset:0 auto auto 0;width:fit-content;max-width:100%;color:var(--text-2);opacity:clamp(0,1.4 - var(--p)*4,1);transform:translateY(calc(var(--p)*-12px))}
+.line.before::after{content:"";position:absolute;left:0;top:.68em;height:2px;width:calc(var(--p)*480%);max-width:100%;background:var(--accent);opacity:.7}
+.line.after .c{opacity:clamp(0,(var(--p) - var(--th,0))*5,1);transform:translateY(calc((1 - clamp(0,(var(--p) - var(--th,0))*5,1))*6px))}
+.tags{display:flex;gap:8px;margin-top:22px}
+.tag{font:500 11px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;padding:7px 10px;border-radius:99px;background:rgba(16,18,63,.06);color:var(--text-2);transition:background-color .4s var(--ease),color .4s var(--ease)}
+.paper.done .tag.t-after{background:rgba(76,81,184,.12);color:var(--violet)}
+.paper:not(.done) .tag.t-before{background:rgba(196,61,37,.1);color:var(--accent-hover)}
+.hold-row{margin-top:26px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.hold{position:relative;display:inline-flex;align-items:center;gap:12px;border:0;border-radius:99px;padding:8px 22px 8px 8px;background:var(--text);color:#fff;font-weight:600;font-size:15.5px;user-select:none;-webkit-user-select:none;touch-action:none;transition:background-color .3s var(--ease),transform .3s var(--ease-out)}
+.hold:hover{background:#1c1f5c}
+.hold:active{transform:scale(.98)}
+.hold svg{width:40px;height:40px}
+.hold .track{stroke:rgba(255,255,255,.2)}
+.hold .prog{stroke:var(--accent);stroke-dasharray:107;stroke-dashoffset:calc(107 - 107*var(--p,0));transform:rotate(-90deg);transform-origin:50% 50%}
+.hold .dot{fill:#fff;transform-origin:50% 50%;transform:scale(calc(.6 + .4*var(--p,0)))}
+.next{border:1px solid var(--line-strong);background:transparent;border-radius:99px;padding:11px 18px;font-weight:600;font-size:15px;opacity:0;pointer-events:none;transition:opacity .4s var(--ease)}
+.paper.done .next{opacity:1;pointer-events:auto}
+
+/* designs */
+.designs{background:linear-gradient(180deg,transparent,rgba(244,247,251,.75) 18%,rgba(244,247,251,.75) 82%,transparent)}
+.designs-head{text-align:center;display:flex;flex-direction:column;align-items:center}
+.designs-head .h2{margin-top:16px;max-width:18ch}
+.designs-head .lede{margin-top:20px;max-width:60ch}
+.chips{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:26px;padding:0;list-style:none}
+.chips li{font:500 12px/1 var(--mono);letter-spacing:.06em;padding:9px 13px;border-radius:99px;border:1px solid var(--line);background:rgba(255,255,255,.6)}
+.shelf{margin-top:46px}
+.shelf+.shelf{margin-top:20px}
+.shelf-label{text-align:center;font:500 12px/1.2 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--text-2)}
+.gallery{margin-top:18px;display:flex;gap:20px;justify-content:center;padding:10px 4px 26px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none}
+.gallery::-webkit-scrollbar{display:none}
+.tcard{flex:none;scroll-snap-align:center;text-decoration:none;color:inherit;display:flex;flex-direction:column;gap:14px}
+.mini{width:172px;height:calc(1122.66px*.2167);border-radius:6px;overflow:hidden;background:#fff;box-shadow:0 1px 2px rgba(16,18,63,.06),0 28px 50px -28px rgba(16,18,63,.45);transition:transform .5s var(--ease-out),box-shadow .5s var(--ease)}
+.mini .cv{transform:scale(.2167);transform-origin:top left;pointer-events:none}
+.tcard:hover .mini,.tcard:focus-visible .mini{transform:translateY(-8px)}
+.designs.live .tcard:nth-child(3) .mini{animation:float 7s var(--ease) infinite alternate;animation-delay:-2s}
+@keyframes float{to{transform:translateY(-6px)}}
+.tname{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.tname b{font:400 22px/1 var(--display)}
+.tname span{font-size:13.5px;color:var(--violet);font-weight:600}
+.sample-note{text-align:center;font-size:13px;color:var(--text-2)}
+
+/* pricing */
+.price-grid{display:grid;grid-template-columns:.9fr 1.1fr;gap:clamp(40px,6vw,90px);align-items:center}
+.zero{display:flex;align-items:flex-start;gap:18px}
+.zero b{font:400 clamp(130px,17vw,240px)/.85 var(--display);letter-spacing:-.04em;color:var(--on-ink)}
+.stamp{flex:none;margin-top:14px;width:clamp(88px,9vw,118px);height:auto}
+.price-grid.live .stamp{animation:glow 6s var(--ease) infinite alternate;animation-delay:-3s}
+@keyframes glow{from{opacity:.86}to{opacity:1}}
+.price-copy .h2{margin-top:16px}
+.price-copy .lede{margin-top:16px}
+.compare{margin-top:30px;display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--line-ink)}
+.compare>div{padding:22px 22px 6px 0}
+.compare>div+div{padding-left:22px;border-left:1px solid var(--line-ink)}
+.compare h3{font:500 12px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--on-ink-2);margin-bottom:14px}
+.compare ul{list-style:none;margin:0;padding:0}
+.compare li{padding:9px 0;border-bottom:1px solid var(--line-ink);font-size:15.5px;line-height:1.45}
+.compare .them li{color:var(--on-ink-2);text-decoration:line-through;text-decoration-color:rgba(240,106,79,.75);text-decoration-thickness:1.5px}
+.compare .us li{display:flex;gap:10px;align-items:baseline}
+.compare .us li::before{content:"";flex:none;width:7px;height:7px;border-radius:50%;background:#F06A4F;transform:translateY(-1px)}
+
+/* questions */
+.faq-grid{display:grid;grid-template-columns:.8fr 1.2fr;gap:clamp(40px,6vw,90px);align-items:start}
+.faq-side{position:sticky;top:110px}
+.faq-side .h2{margin-top:16px}
+.yours{margin-top:30px;padding:22px 24px;border-radius:16px;background:rgba(255,255,255,.6);border:1px solid var(--line)}
+.yours h3{font:400 24px/1.2 var(--display)}
+.yours p{margin-top:8px;font-size:15.5px;color:var(--text-2)}
+.faq{border-top:1px solid var(--line)}
+.faq details{border-bottom:1px solid var(--line)}
+.faq summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:baseline;gap:20px;padding:24px 2px;font:400 clamp(21px,1.9vw,26px)/1.25 var(--display)}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{content:"";flex:none;width:12px;height:12px;border-right:1.5px solid var(--text);border-bottom:1.5px solid var(--text);transform:translateY(-4px) rotate(45deg);transition:transform .4s var(--ease-out)}
+.faq details[open] summary::after{transform:translateY(2px) rotate(225deg)}
+.faq .ans{overflow:hidden}
+.faq .ans p{padding:0 2px 24px;color:var(--text-2);max-width:60ch}
+
+/* final call */
+.final{text-align:center;padding:clamp(110px,14vw,180px) 0 clamp(90px,10vw,130px)}
+.final .h2{margin:0 auto;max-width:15ch;font-size:clamp(44px,6.4vw,92px)}
+.final .lede{margin:20px auto 0}
+.final-ctas{margin-top:38px;display:flex;gap:14px;justify-content:center;align-items:center;flex-wrap:wrap}
+.final .btn{padding:18px 32px;font-size:17px}
+.btn-alt{display:inline-flex;align-items:center;justify-content:center;border-radius:99px;padding:17px 28px;font-weight:600;font-size:17px;text-decoration:none;color:var(--on-ink);border:1px solid rgba(154,166,214,.6);transition:background-color .3s var(--ease),border-color .3s var(--ease)}
+.btn-alt:hover{background:rgba(154,166,214,.12);border-color:var(--on-ink)}
+@media (pointer:coarse){.btn-alt{min-height:44px}}
+.final.lit .btn::after{animation:stampPulse 1.4s var(--ease-out) 1}
+@keyframes stampPulse{0%{opacity:1;box-shadow:0 0 0 0 rgba(240,106,79,.6)}100%{opacity:.55;box-shadow:0 0 0 22px rgba(240,106,79,0)}}
+footer{background:var(--ink);color:var(--on-ink-2);border-top:1px solid var(--line-ink);font-size:14px}
+.foot{display:flex;flex-wrap:wrap;gap:20px 34px;align-items:center;justify-content:space-between;padding:30px var(--gutter)}
+.foot .brand{color:var(--on-ink);margin:0}
+.foot nav{display:flex;flex-wrap:wrap;gap:6px 22px}
+.foot a{text-decoration:none}
+.foot a:hover{color:var(--on-ink)}
+
+@media (max-width:960px){
+  .how-head,.try-grid,.price-grid,.faq-grid{grid-template-columns:1fr}
+  .how-head .lede{justify-self:start}
+  .faq-side{position:static}
+  .gallery{justify-content:flex-start;padding-left:var(--gutter);padding-right:var(--gutter);scroll-padding:0 var(--gutter)}
+}
+@media (max-width:720px){
+  .steps{grid-template-columns:1fr;gap:44px}
+  .step .ph{aspect-ratio:4/3}
+  .compare{grid-template-columns:1fr}
+  .compare>div+div{padding-left:0;border-left:0}
+  .paper{padding:26px 22px 24px}
+  .zero b{font-size:clamp(120px,40vw,180px)}
+}
+
+/* pause every loop on hidden tabs */
+body.paused *,body.paused *::before,body.paused *::after{animation-play-state:paused!important}
+
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important;transition-delay:0s!important}
+  .js [data-reveal] .r{opacity:1;transform:none}
+  .line.before{display:none}
+  .paper{--p:1}
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="env" aria-hidden="true"><i></i><i></i></div>
+
+<nav class="nav" aria-label="Main">
+  <a class="brand" href="#top" aria-label="Inkline, back to top">
+    <svg viewBox="0 0 64 64" aria-hidden="true"><path d="M32 6C32 6 14 28 14 40a18 18 0 0 0 36 0C50 28 32 6 32 6z" fill="#10123F"/><circle cx="40" cy="44" r="5" fill="#C43D25"/></svg>
+    Inkline
+  </a>
+  <a class="nl" href="#how">How it works</a>
+  <a class="nl" href="#designs">Designs</a>
+  <a class="nl" href="#questions">Questions</a>
+  <a class="btn" href="builder.html">Start my CV</a>
+</nav>
+
+<main id="main" tabindex="-1">
+  <section class="hero" id="top" aria-label="Introduction">
+    <div class="stage" id="stage">
+      <div class="poster" id="poster" aria-hidden="true"></div>
+      <canvas id="hero" aria-hidden="true"></canvas>
+      <div class="wash" aria-hidden="true"></div>
+      <div class="deep" id="deep" aria-hidden="true"></div>
+
+      <div class="band band-l b1" data-a="0" data-b="0.22">
+        <p class="kicker bk">Inkline · The AI CV maker</p>
+        <h1 class="bh split">Don't know what to write?</h1>
+        <p class="bs">Most people don't. You just need someone to ask the right questions.</p>
+      </div>
+      <div class="band band-r b2" data-a="0.26" data-b="0.48">
+        <h2 class="bh"><span class="soft-wrap"><span class="soft" aria-hidden="true">So just talk.</span><span class="sharp">So just talk.</span></span></h2>
+        <p class="bs">Our AI asks easy questions, one at a time, like a good recruiter would.</p>
+      </div>
+      <div class="band band-l b3" data-a="0.52" data-b="0.73" data-spread="0.5">
+        <h2 class="bh split chars">Your words, made clear.</h2>
+        <p class="bs">It turns your answers into strong, honest lines that still sound like you.</p>
+      </div>
+      <div class="band band-c b4" data-a="0.77" data-b="1" data-ramp="0.06">
+        <p class="kicker bk">Free. No card. No watermark.</p>
+        <h2 class="bh split">A CV that gets read.</h2>
+        <p class="bs">Colourful designs with your photo, or clean classics that hiring software reads best. Ready in about ten minutes.</p>
+        <div class="cta-row">
+          <a class="btn" href="builder.html"><span class="seal" aria-hidden="true"></span>Start my CV</a>
+          <a class="link" href="#designs">See the designs</a>
+        </div>
+      </div>
+
+      <div class="static-copy">
+        <p class="kicker">Inkline · The AI CV maker</p>
+        <h1>Your CV, made clear.</h1>
+        <div class="sc-body">
+          <p>Talk to our AI or fill in a template yourself. Pick a beautiful design, add your photo, and download it free.</p>
+          <a class="btn" href="builder.html"><span class="seal" aria-hidden="true"></span>Start my CV</a>
+        </div>
+      </div>
+
+      <svg class="ring" id="ring" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="20" fill="none" stroke="currentColor" stroke-opacity=".2" stroke-width="2.5"/><circle cx="24" cy="24" r="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="126" style="stroke-dashoffset:var(--ld,126)"/></svg>
+      <div class="cue" id="cue" aria-hidden="true">Scroll to begin</div>
+    </div>
+  </section>
+
+  <div id="after-hero" style="position:relative">
+    <svg class="trail" id="trail" aria-hidden="true"><path id="trail-path" d=""/><circle class="tip" id="trail-tip" r="3.5" cx="-10" cy="-10"/></svg>
+
+    <section class="on-ink how pad" id="how" data-reveal data-live>
+      <div class="wrap">
+        <div class="how-head">
+          <div>
+            <p class="kicker r">How it works</p>
+            <h2 class="h2 r" style="margin-top:16px">From blank page to finished CV.</h2>
+          </div>
+          <p class="lede r">Talk to the AI, or fill in a template yourself. No account, no card, nothing to install.</p>
+        </div>
+        <ol class="steps">
+          <li class="step r">
+            <div class="ph"><img src="assets/step-talk.jpg" alt="A single drop of ink falling into clear water" width="720" height="720" loading="lazy" decoding="async"></div>
+            <span class="num">01</span>
+            <h3>Talk or type</h3>
+            <p>Answer easy questions in a chat, upload your old CV, or fill in a simple form yourself. Ask anything along the way.</p>
+          </li>
+          <li class="step r">
+            <div class="ph"><img src="assets/step-polish.jpg" alt="The ink blooming into a soft cloud" width="720" height="720" loading="lazy" decoding="async"></div>
+            <span class="num">02</span>
+            <h3>Polish</h3>
+            <p>The AI turns your answers into clear, strong lines. It only uses facts you give it, and you can change any word.</p>
+          </li>
+          <li class="step r">
+            <div class="ph"><img src="assets/step-download.jpg" alt="The ink settled into a calm layer" width="720" height="720" loading="lazy" decoding="async"></div>
+            <span class="num">03</span>
+            <h3>Download</h3>
+            <p>Pick one of 11 designs, add your photo if you like, then save your PDF. Free, with no watermark.</p>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="pad" id="try" data-reveal aria-labelledby="try-title">
+      <div class="wrap try-grid">
+        <div class="try-copy">
+          <p class="kicker r">Try it</p>
+          <h2 class="h2 r" id="try-title">Watch a weak line get stronger.</h2>
+          <p class="lede r">Press and hold the button. This is what Inkline does with your answers.</p>
+          <p class="note r">The AI only uses facts you tell it. When a number would help, it asks you for one. It never makes them up.</p>
+        </div>
+        <div class="r">
+          <div class="paper" id="paper">
+            <p class="ctx" id="ctx">Social media assistant · Bloom Florists</p>
+            <div class="lines" aria-live="polite">
+              <p class="line before" id="before">Responsible for social media.</p>
+              <p class="line after" id="after" aria-hidden="true"></p>
+              <p class="sr-only" id="after-sr"></p>
+            </div>
+            <div class="tags"><span class="tag t-before">Before</span><span class="tag t-after">After</span></div>
+            <div class="hold-row">
+              <button class="hold" id="hold" type="button" aria-describedby="hold-help">
+                <svg viewBox="0 0 40 40" aria-hidden="true"><circle class="track" cx="20" cy="20" r="17" fill="none" stroke-width="3"/><circle class="prog" cx="20" cy="20" r="17" fill="none" stroke-width="3" stroke-linecap="round"/><circle class="dot" cx="20" cy="20" r="6"/></svg>
+                <span id="hold-label">Hold to rewrite</span>
+              </button>
+              <button class="next" id="next" type="button">Try another line</button>
+              <span class="sr-only" id="hold-help">Press and hold, or hold the space bar, to rewrite the line.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="designs pad" id="designs" data-reveal data-live aria-labelledby="designs-title">
+      <div class="wrap designs-head">
+        <p class="kicker r">The designs</p>
+        <h2 class="h2 r" id="designs-title">Designs that get you noticed.</h2>
+        <p class="lede r">Six colourful designs with a spot for your photo, and five clean classics. Use a colourful one when you email or hand in your CV. Use a classic for online application forms, because hiring software reads one clean column best.</p>
+        <ul class="chips r"><li>11 designs</li><li>Add your photo</li><li>9 colours</li><li>7 font styles</li><li>Adjustable text size</li></ul>
+      </div>
+      <div class="shelf r">
+        <p class="shelf-label">Colourful, with your photo</p>
+        <div class="gallery" id="gallery" aria-label="Colourful designs">
+          <a class="tcard" href="builder.html?template=atlas" aria-label="Use the Atlas design">
+            <div class="mini" aria-hidden="true"><div class="cv tpl-atlas two has-photo" style="--cv-accent:#1E3A5F" lang="en"><div class="cv-grid"><div class="cv-main"><header class="cv-head"><h1 class="cv-name">Maya Okafor</h1><p class="cv-title">Marketing Manager</p></header><section class="cv-section"><h2>Profile</h2><p class="cv-summary">Marketing manager with seven years in retail and food brands. I plan campaigns that people actually talk about, and I measure what works so the next one does better.</p></section><section class="cv-section cv-exp"><h2>Experience</h2> <article class="cv-entry"> <div class="cv-entry-top"><h3 class="cv-role">Marketing Manager</h3><span class="cv-dates">2021 to Present</span></div> <p class="cv-org"><span>Northfield Coffee Co.</span>, <span>Manchester</span></p> <ul class="cv-bullets"><li>Grew Instagram from 2,000 to 18,000 followers in one year with a weekly behind-the-counter series.</li><li>Led the launch of three seasonal drinks, each selling out in its first month.</li><li>Manage a team of four and a yearly budget of £120,000.</li></ul> </article> <article class="cv-entry"> <div class="cv-entry-top"><h3 class="cv-role">Marketing Coordinator</h3><span class="cv-dates">2018 to 2021</span></div> <p class="cv-org"><span>Greenway Stores</span>, <span>Leeds</span></p> <ul class="cv-bullets"><li>Ran email campaigns for 40,000 customers, lifting repeat orders by 12%.</li><li>Organised 25 in-store events with local suppliers.</li></ul> </article></section><section class="cv-section cv-edu"><h2>Education</h2> <article class="cv-entry"> <div class="cv-entry-top"><h3 class="cv-role">BA Marketing</h3><span class="cv-dates">2014 to 2017</span></div> <p class="cv-org"><span>University of Leeds</span>, <span>Leeds</span></p> <p class="cv-details">First-class honours. Final project on local brand loyalty.</p> </article></section></div><aside class="cv-side"><div class="cv-photo"><img src="assets/sample-photo.jpg" alt=""></div><section class="cv-section cv-contact-sec"><h2>Contact</h2><ul class="cv-contact-list"><li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="M4 7l8 6 8-6"/></svg><span>maya.okafor@email.com</span></li><li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3.5h3l1.5 4.5-2.2 1.4a12 12 0 0 0 5.3 5.3l1.4-2.2 4.5 1.5v3a2 2 0 0 1-2 2A16.5 16.5 0 0 1 5 5.5a2 2 0 0 1 2-2z"/></svg><span>+44 7700 900123</span></li><li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg><span>Manchester, UK</span></li><li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg><span>linkedin.com/in/mayaokafor</span></li></ul></section><section class="cv-section"><h2>Skills</h2><ul class="cv-tags"><li>Campaign planning</li><li>Social media</li><li>Email marketing</li><li>Google Analytics</li><li>Budgeting</li><li>Team leadership</li></ul></section><section class="cv-section"><h2>Languages</h2><ul class="cv-tags"><li>English (native)</li><li>Yoruba (conversational)</li></ul></section><section class="cv-section"><h2>Certifications</h2><ul class="cv-bullets"><li>Google Analytics Certification, 2023</li><li>Meta Social Media Marketing, 2022</li></ul></section></aside></div></div></div>
+            <div class="tname"><b>Atlas</b><span>Use this</span></div>
+          </a>
+          <a class="tcard" href="builder.html?template=vertex" aria-label="Use the Vertex design">
+            <div class="mini" aria-hidden="true"><div class="cv tpl-vertex two has-photo" style="--cv-accent:#145E63" lang="en"><div class="cv-top"><header class="cv-head"><h1 class="cv-name">Maya Okafor</h1><p class="cv-title">Marketing Manager</p></header><div class="cv-photo"><img src="assets/sample-photo.jpg" alt=""></div></div><div class="cv-grid"><div class="cv-main"><section class="cv-section"><h2>Profile</h2><p class="cv-summary">Marketing manager with seven years in retail and food brands. I plan campaigns that people actually talk about, and I measure what works so the next one does better.</p></section><section class="cv-section cv-exp"><h2>Experience</h2> <article class="cv-entry"> <div class="cv-entry-top"><h3 class="cv-role">Marketing Manager</h3><span class="cv-dates">2021 to Present</span></div> <p class="cv-org"><span>Northfield Coffee Co.</span>, <span>Manchester</span></p> <ul class="cv-bullets"><li>Grew Instagram from 2,000 to 18,000 followers in one year with a weekly behind-the-counter series.</li><li>Led the launch of three seasonal drinks, each selling out in its first month.</li><li>Manage a team of four and a yearly budget of £120,000.</li></ul> </article> <article class="cv-entry"> <div class="cv-entry-top"><h3 class="cv-role">Marketing Coordinator</h3><span class="cv-dates">2018 to 2021</span></div> <p class="cv-org"><span>Greenway Stores</span>, <span>Leeds</span></p> <ul class="cv-bullets"><li>Ran email campaigns for 40,000 customers, lifting repeat orders by 12%.</li><li>Organised 25 in-store events with local suppliers.</li></ul> </article></section><section class="cv-section"><h2>Certifications</h2><ul class="cv-bullets"><li>Google Analytics Certification, 2023</li><li>Meta Social Media Marketing, 2022</li></ul></section></div><aside class="cv-side"><section class="cv-section cv-contact-sec"><h2>Contact</h2><ul class="cv-contact-list"><li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="M4 7l8 6 8-6"/></svg><span>maya.okafor@email.com</span></li><li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3.5h3l1.5 4.5-2.2 1.4a12 12 0 0 0 5.3 5.3l1.4-2.2 4.5 1.5v3a2 2 0 0 1-2 2A16.5 16.5 0 0 1 5 5.5a2 2 0 0 1 2-2z"/></svg><span>+44 7700 900123</span></li><li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg><span>Manchester, UK</span></li><li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg><span>linkedin.com/in/mayaokafor</span></li></ul></section><section class="cv-section cv-edu"><h2>Education</h2> <article class="cv-entry"> <div class="cv-entry-top"><h3 class="cv-role">BA Marketing</h3><span class="cv-dates">2014 to 2017</span></div> <p class="cv-org"><span>University of Leeds</span>, <span>Leeds</span></p> <p class="cv-details">First-class honours. Final project on local brand loyalty.</p> </article></section><section class="cv-section"><h2>Skills</h2><ul class="cv-tags"><li>Campaign planning</li><li>Social media</li><li>Email marketing</li><li>Google Analytics</li><li>Budgeting</li><li>Team leadership</li></ul></section><section class="cv-section"><h2>Languages</h2><ul class="cv-tags"><li>English (native)</li><li>Yoruba (conversational)</li></ul></section></aside></div></div></div>
+            <div class="tname"><b>Vertex</b><span>Use this</span></div>
+          </a>
+          <a class="tcard" href="builder.html?template=sage" aria-label="Use the Sage design">
+            <div class="mini" aria-hidden="true"><div class="cv tpl-sage two has-photo" style="--cv-accent:#4A6656" lang="en"><div class="cv-top"><div class="cv-photo"><img src="assets/sample-photo.jpg" alt=""></div><header class="cv-head"><h1 class="cv-name">Maya Okafor</h1><p class="cv-title">Marketing Manager</p></header></div><div class="cv-grid"><div class="cv-main"><section class="cv-section"><h2>Profile</h2><p class="cv-summary">Marketing manager with seven years in retail and food brands. I plan campaigns that people actually talk about, and I measure what works so the next one does better.</p></section><section class="cv-section cv-exp"><h2>Experience</h2> <article class="cv-entry"> <div class="cv-entry-top"><h3 class="cv-role">Marketing Manager</h3><span class="cv-dates">2021 to Present</span></div> <p class="cv-org"><span>Northfield Coffee Co.</span>, <span>Manchester</span></p> <ul class="cv-bullets"><li>Grew Instagram from 2,000 to 18,000 followers in one year with a weekly behind-the-counter series.</li><li>Led the launch of three seasonal drinks, each selling out in its first month.</li><li>Manage a team of four and a yearly budget of £120,000.</li></ul> </article> <article class="cv-entry"> <div class="cv-entry-top"><h3 class="cv-role">Marketing Coordinator</h3><span class="cv-dates">2018 to 2021</span></div> <p class="cv-org"><span>Greenway Stores</span>, <span>Leeds</span></p> <ul class="cv-bullets"><li>Ran email campaigns for 40,000 customers, lifting repeat orders by 12%.</li><li>Organised 25 in-store events with local suppliers.</li></ul> </article></section><section class="cv-section"><h2>Certifications</h2><ul class="cv-bullets"><li>Google Analytics Certification, 2023</li><li>Meta Social Media Marketing, 2022</li></ul></section></div><aside class="cv-side"><section class="cv-section cv-contact-sec"><h2>Contact</h2><ul class="cv-contact-list"><li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="M4 7l8 6 8-6"/></svg><span>maya.okafor@email.com</span></li><li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3.5h3l1.5 4.5-2.2 1.4a12 12 0 0 0 5.3 5.3l1.4-2.2 4.5 1.5v3a2 2 0 0 1-2 2A16.5 16.5 0 0 1 5 5.5a2 2 0 0 1 2-2z"/></svg><span>+44 7700 900123</span></li><li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg><span>Manchester, UK</span></li><li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg><span>linkedin.com/in/mayaokafor</span></li></ul></section><section class="cv-section"><h2>Skills</h2><ul class="cv-tags"><li>Campaign planning</li><li>Social media</li><li>Email marketing</li><li>Google Analytics</li><li>Budgeting</li><li>Team leadership</li></ul></section><section class="cv-section"><h2>Languages</h2><ul class="cv-tags"><li>English (native)</li><li>Yoruba (conversational)</li></ul></section><section class="cv-section cv-edu"><h2>Education</h2> <article class="cv-entry"> <div class="cv-entry-top"><h3 class="cv-role">BA Marketing</h3><span class="cv-dates">2014 to 2017</span></div> <p class="cv-org"><span>University of Leeds</span>, <span>Leeds</span></p> <p class="cv-details">First-class honours. Final project on local brand loyalty.</p> </article></section></aside></div></div></div>
+            <div class="tname"><b>Sage</b><span>Use this</span></div>
+          </a>
+          <a class="tcard" href="builder.html?template=bloom" aria-label="Use the Bloom design">
+            <div class="mini" aria-hidden="true"><div class="cv tpl-bloom two has-photo" style="--cv-accent:#94455E" lang="en"><div class="cv-grid"><div class="cv-main"><header class="cv-head"><h1 class="cv-name">Maya Okafor</h1><p class="cv-title">Marketing Manager</p></header><section class="cv-section"><h2>Profile</h2><p class="cv-summary">Marketing manager with seven years in retail and food brands. I plan campaigns that people actually talk about, and I measure what works so the next one does better.</p></section><section class="cv-section cv-exp"><h2>Experience</h2> <article class="cv-entry"> <div class="cv-entry-top"><h3 class="cv-role">Marketing Manager</h3><span class="cv-dates">2021 to Present</span></div> <p class="cv-org"><span>Northfield Coffee Co.</span>, <span>Manchester</span></p> <ul class="cv-bullets"><li>Grew Instagram from 2,000 to 18,000 followers in one year with a weekly behind-the-counter series.</li><li>Led the launch of three seasonal drinks, each selling out in its first month.</li><li>Manage a team of four and a yearly budget of £120,000.</li></ul> </article> <article class="cv-entry"> <div class="cv-entry-top"><h3 class="cv-role">Marketing Coordinator</h3><span class="cv-dates">2018 to 2021</span></div> <p class="cv-org"><span>Greenway Stores</span>, <span>Leeds</span></p> <ul class="cv-bullets"><li>Ran email campaigns for 40,000 customers, lifting repeat orders by 12%.</li><li>Organised 25 in-store events with local suppliers.</li></ul> </article></section><section class="cv-section cv-edu"><h2>Education</h2> <article class="cv-entry"> <div class="cv-entry-top"><h3 class="cv-role">BA Marketing</h3><span class="cv-dates">2014 to 2017</span></div> <p class="cv-org"><span>University of Leeds</span>, <span>Leeds</span></p> <p class="cv-details">First-class honours. Final project on local brand loyalty.</p> </article></section><section class="cv-section"><h2>Certifications</h2><ul class="cv-bullets"><li>Google Analytics Certification, 2023</li><li>Meta Social Media Marketing, 2022</li></ul></section></div><aside class="cv-side"><div class="cv-photo"><img src="assets/sample-photo.jpg" alt=""></div><section class="cv-section cv-contact-sec"><h2>Contact</h2><ul class="cv-contact-list"><li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="M4 7l8 6 8-6"/></svg><span>maya.okafor@email.com</span></li><li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3.5h3l1.5 4.5-2.2 1.4a12 12 0 0 0 5.3 5.3l1.4-2.2 4.5 1.5v3a2 2 0 0 1-2 2A16.5 16.5 0 0 1 5 5.5a2 2 0 0 1 2-2z"/></svg><span>+44 7700 900123</span></li><li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg><span>Manchester, UK</span></li><li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg><span>linkedin.com/in/mayaokafor</span></li></ul></section><section class="cv-section"><h2>Skills</h2><ul class="cv-tags"><li>Campaign planning</li><li>Social media</li><li>Email marketing</li><li>Google Analytics</li><li>Budgeting</li><li>Team leadership</li></ul></section><section class="cv-section"><h2>Languages</h2><ul class="cv-tags"><li>English (native)</li><li>Yoruba (conversational)</li></ul></section></aside></div></div></div>
+            <div class="tname"><b>Bloom</b><span>Use this</span></div>
+          </a>
+          <a class="tcard" href="builder.html?template=noir" aria-label="Use the Noir design">
+            <div class="mini" aria-hidden="true"><div class="cv tpl-noir two has-photo" style="--cv-accent:#25272F" lang="en"><div class="cv-grid"><div class="cv-main"><header class="cv-head"><h1 class="cv-name">Maya Okafor</h1><p class="cv-title">Marketing Manager</p></header><section class="cv-section"><h2>Profile</h2><p class="cv-summary">Marketing manager with seven years in retail and food brands. I plan campaigns that people actually talk about, and I measure what works so the next one does better.</p></section><section class="cv-section cv-exp"><h2>Experience</h2> <article class="cv-entry"> <div class="cv-entry-top"><h3 class="cv-role">Marketing Manager</h3><span class="cv-dates">2021 to Present</span></div> <p class="cv-org"><span>Northfield Coffee Co.</span>, <span>Manchester</span></p> <ul class="cv-bullets"><li>Grew Instagram from 2,000 to 18,000 followers in one year with a weekly behind-the-counter series.</li><li>Led the launch of three seasonal drinks, each selling out in its first month.</li><li>Manage a team of four and a yearly budget of £120,000.</li></ul> </article> <article class="cv-entry"> <div class="cv-entry-top"><h3 class="cv-role">Marketing Coordinator</h3><span class="cv-dates">2018 to 2021</span></div> <p class="cv-org"><span>Greenway Stores</span>, <span>Leeds</span></p> <ul class="cv-bullets"><li>Ran email campaigns for 40,000 customers, lifting repeat orders by 12%.</li><li>Organised 25 in-store events with local suppliers.</li></ul> </article></section><section class="cv-section cv-edu"><h2>Education</h2> <article class="cv-entry"> <div class="cv-entry-top"><h3 class="cv-role">BA Marketing</h3><span class="cv-dates">2014 to 2017</span></div> <p class="cv-org"><span>University of Leeds</span>, <span>Leeds</span></p> <p class="cv-details">First-class honours. Final project on local brand loyalty.</p> </article></section></div><aside class="cv-side"><div class="cv-photo"><img src="assets/sample-photo.jpg" alt=""></div><section class="cv-section cv-contact-sec"><h2>Contact</h2><ul class="cv-contact-list"><li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="M4 7l8 6 8-6"/></svg><span>maya.okafor@email.com</span></li><li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3.5h3l1.5 4.5-2.2 1.4a12 12 0 0 0 5.3 5.3l1.4-2.2 4.5 1.5v3a2 2 0 0 1-2 2A16.5 16.5 0 0 1 5 5.5a2 2 0 0 1 2-2z"/></svg><span>+44 7700 900123</span></li><li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg><span>Manchester, UK</span></li><li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg><span>linkedin.com/in/mayaokafor</span></li></ul></section><section class="cv-section"><h2>Skills</h2><ul class="cv-tags"><li>Campaign planning</li><li>Social media</li><li>Email marketing</li><li>Google Analytics</li><li>Budgeting</li><li>Team leadership</li></ul></section><section class="cv-section"><h2>Languages</h2><ul class="cv-tags"><li>English (native)</li><li>Yoruba (conversational)</li></ul></section><section class="cv-section"><h2>Certifications</h2><ul class="cv-bullets"><li>Google Analytics Certification, 2023</li><li>Meta Social Media Marketing, 2022</li></ul></section></aside></div></div></div>
+            <div class="tname"><b>Noir</b><span>Use this</span></div>
+          </a>
+          <a class="tcard" href="builder.html?template=horizon" aria-label="Use the Horizon design">
+            <div class="mini" aria-hidden="true"><div class="cv tpl-horizon two has-photo" style="--cv-accent:#7F5C10" lang="en"><div class="cv-top"><div class="cv-photo"><img src="assets/sample-photo.jpg" alt=""></div><header class="cv-head"><h1 class="cv-name">Maya Okafor</h1><p class="cv-title">Marketing Manager</p></header><p class="cv-contact"><span>maya.okafor@email.com</span><span>+44 7700 900123</span><span>Manchester, UK</span><span>linkedin.com/in/mayaokafor</span></p></div><div class="cv-grid"><div class="cv-main"><section class="cv-section"><h2>Profile</h2><p class="cv-summary">Marketing manager with seven years in retail and food brands. I plan campaigns that people actually talk about, and I measure what works so the next one does better.</p></section><section class="cv-section cv-exp"><h2>Experience</h2> <article class="cv-entry"> <div class="cv-entry-top"><h3 class="cv-role">Marketing Manager</h3><span class="cv-dates">2021 to Present</span></div> <p class="cv-org"><span>Northfield Coffee Co.</span>, <span>Manchester</span></p> <ul class="cv-bullets"><li>Grew Instagram from 2,000 to 18,000 followers in one year with a weekly behind-the-counter series.</li><li>Led the launch of three seasonal drinks, each selling out in its first month.</li><li>Manage a team of four and a yearly budget of £120,000.</li></ul> </article> <article class="cv-entry"> <div class="cv-entry-top"><h3 class="cv-role">Marketing Coordinator</h3><span class="cv-dates">2018 to 2021</span></div> <p class="cv-org"><span>Greenway Stores</span>, <span>Leeds</span></p> <ul class="cv-bullets"><li>Ran email campaigns for 40,000 customers, lifting repeat orders by 12%.</li><li>Organised 25 in-store events with local suppliers.</li></ul> </article></section><section class="cv-section"><h2>Certifications</h2><ul class="cv-bullets"><li>Google Analytics Certification, 2023</li><li>Meta Social Media Marketing, 2022</li></ul></section></div><aside class="cv-side"><section class="cv-section cv-edu"><h2>Education</h2> <article class="cv-entry"> <div class="cv-entry-top"><h3 class="cv-role">BA Marketing</h3><span class="cv-dates">2014 to 2017</span></div> <p class="cv-org"><span>University of Leeds</span>, <span>Leeds</span></p> <p class="cv-details">First-class honours. Final project on local brand loyalty.</p> </article></section><section class="cv-section"><h2>Skills</h2><ul class="cv-tags"><li>Campaign planning</li><li>Social media</li><li>Email marketing</li><li>Google Analytics</li><li>Budgeting</li><li>Team leadership</li></ul></section><section class="cv-section"><h2>Languages</h2><ul class="cv-tags"><li>English (native)</li><li>Yoruba (conversational)</li></ul></section></aside></div></div></div>
+            <div class="tname"><b>Horizon</b><span>Use this</span></div>
+          </a>
+        </div>
+      </div>
+      <div class="shelf r">
+        <p class="shelf-label">Classic, best for online applications</p>
+        <div class="gallery" aria-label="Classic designs">
+          <a class="tcard" href="builder.html?template=indigo" aria-label="Use the Indigo design">
+            <div class="mini" aria-hidden="true"><div class="cv tpl-indigo one" style="--cv-accent:#2B2F8F" lang="en"><header class="cv-head"><div class="cv-head-text"><h1 class="cv-name">Maya Okafor</h1><p class="cv-title">Marketing Manager</p><p class="cv-contact"><span>maya.okafor@email.com</span><span>+44 7700 900123</span><span>Manchester, UK</span><span>linkedin.com/in/mayaokafor</span></p></div></header><section class="cv-section"><h2>Profile</h2><p class="cv-summary">Marketing manager with seven years in retail and food brands. I plan campaigns that people actually talk about, and I measure what works so the next one does better.</p></section><section class="cv-section cv-exp"><h2>Experience</h2> <article class="cv-entry"> <div class="cv-entry-top"><h3 class="cv-role">Marketing Manager</h3><span class="cv-dates">2021 to Present</span></div> <p class="cv-org"><span>Northfield Coffee Co.</span>, <span>Manchester</span></p> <ul class="cv-bullets"><li>Grew Instagram from 2,000 to 18,000 followers in one year with a weekly behind-the-counter series.</li><li>Led the launch of three seasonal drinks, each selling out in its first month.</li><li>Manage a team of four and a yearly budget of £120,000.</li></ul> </article> <article class="cv-entry"> <div class="cv-entry-top"><h3 class="cv-role">Marketing Coordinator</h3><span class="cv-dates">2018 to 2021</span></div> <p class="cv-org"><span>Greenway Stores</span>, <span>Leeds</span></p> <ul class="cv-bullets"><li>Ran email campaigns for 40,000 customers, lifting repeat orders by 12%.</li><li>Organised 25 in-store events with local suppliers.</li></ul> </article></section><section class="cv-section cv-edu"><h2>Education</h2> <article class="cv-entry"> <div class="cv-entry-top"><h3 class="cv-role">BA Marketing</h3><span class="cv-dates">2014 to 2017</span></div> <p class="cv-org"><span>University of Leeds</span>, <span>Leeds</span></p> <p class="cv-details">First-class honours. Final project on local brand loyalty.</p> </article></section><section class="cv-section"><h2>Skills</h2><ul class="cv-tags"><li>Campaign planning</li><li>Social media</li><li>Email marketing</li><li>Google Analytics</li><li>Budgeting</li><li>Team leadership</li></ul></section><section class="cv-section"><h2>Languages</h2><ul class="cv-tags"><li>English (native)</li><li>Yoruba (conversational)</li></ul></section><section class="cv-section"><h2>Certifications</h2><ul class="cv-bullets"><li>Google Analytics Certification, 2023</li><li>Meta Social Media Marketing, 2022</li></ul></section></div></div>
+            <div class="tname"><b>Indigo</b><span>Use this</span></div>
+          </a>
+          <a class="tcard" href="builder.html?template=harbor" aria-label="Use the Harbor design">
+            <div class="mini" aria-hidden="true"><div class="cv tpl-harbor one" style="--cv-accent:#1E3A5F" lang="en"><header class="cv-head"><div class="cv-head-text"><h1 class="cv-name">Maya Okafor</h1><p class="cv-title">Marketing Manager</p><p class="cv-contact"><span>maya.okafor@email.com</span><span>+44 7700 900123</span><span>Manchester, UK</span><span>linkedin.com/in/mayaokafor</span></p></div></header><section class="cv-section"><h2>Profile</h2><p class="cv-summary">Marketing manager with seven years in retail and food brands. I plan campaigns that people actually talk about, and I measure what works so the next one does better.</p></section><section class="cv-section cv-exp"><h2>Experience</h2> <article class="cv-entry"> <div class="cv-entry-top"><h3 class="cv-role">Marketing Manager</h3><span class="cv-dates">2021 to Present</span></div> <p class="cv-org"><span>Northfield Coffee Co.</span>, <span>Manchester</span></p> <ul class="cv-bullets"><li>Grew Instagram from 2,000 to 18,000 followers in one year with a weekly behind-the-counter series.</li><li>Led the launch of three seasonal drinks, each selling out in its first month.</li><li>Manage a team of four and a yearly budget of £120,000.</li></ul> </article> <article class="cv-entry"> <div class="cv-entry-top"><h3 class="cv-role">Marketing Coordinator</h3><span class="cv-dates">2018 to 2021</span></div> <p class="cv-org"><span>Greenway Stores</span>, <span>Leeds</span></p> <ul class="cv-bullets"><li>Ran email campaigns for 40,000 customers, lifting repeat orders by 12%.</li><li>Organised 25 in-store events with local suppliers.</li></ul> </article></section><section class="cv-section cv-edu"><h2>Education</h2> <article class="cv-entry"> <div class="cv-entry-top"><h3 class="cv-role">BA Marketing</h3><span class="cv-dates">2014 to 2017</span></div> <p class="cv-org"><span>University of Leeds</span>, <span>Leeds</span></p> <p class="cv-details">First-class honours. Final project on local brand loyalty.</p> </article></section><section class="cv-section"><h2>Skills</h2><ul class="cv-tags"><li>Campaign planning</li><li>Social media</li><li>Email marketing</li><li>Google Analytics</li><li>Budgeting</li><li>Team leadership</li></ul></section><section class="cv-section"><h2>Languages</h2><ul class="cv-tags"><li>English (native)</li><li>Yoruba (conversational)</li></ul></section><section class="cv-section"><h2>Certifications</h2><ul class="cv-bullets"><li>Google Analytics Certification, 2023</li><li>Meta Social Media Marketing, 2022</li></ul></section></div></div>
+            <div class="tname"><b>Harbor</b><span>Use this</span></div>
+          </a>
+          <a class="tcard" href="builder.html?template=folio" aria-label="Use the Folio design">
+            <div class="mini" aria-hidden="true"><div class="cv tpl-folio one" style="--cv-accent:#25272F" lang="en"><header class="cv-head"><div class="cv-head-text"><h1 class="cv-name">Maya Okafor</h1><p class="cv-title">Marketing Manager</p><p class="cv-contact"><span>maya.okafor@email.com</span><span>+44 7700 900123</span><span>Manchester, UK</span><span>linkedin.com/in/mayaokafor</span></p></div></header><section class="cv-section"><h2>Profile</h2><p class="cv-summary">Marketing manager with seven years in retail and food brands. I plan campaigns that people actually talk about, and I measure what works so the next one does better.</p></section><section class="cv-section cv-exp"><h2>Experience</h2> <article class="cv-entry"> <div class="cv-entry-top"><h3 class="cv-role">Marketing Manager</h3><span class="cv-dates">2021 to Present</span></div> <p class="cv-org"><span>Northfield Coffee Co.</span>, <span>Manchester</span></p> <ul class="cv-bullets"><li>Grew Instagram from 2,000 to 18,000 followers in one year with a weekly behind-the-counter series.</li><li>Led the launch of three seasonal drinks, each selling out in its first month.</li><li>Manage a team of four and a yearly budget of £120,000.</li></ul> </article> <article class="cv-entry"> <div class="cv-entry-top"><h3 class="cv-role">Marketing Coordinator</h3><span class="cv-dates">2018 to 2021</span></div> <p class="cv-org"><span>Greenway Stores</span>, <span>Leeds</span></p> <ul class="cv-bullets"><li>Ran email campaigns for 40,000 customers, lifting repeat orders by 12%.</li><li>Organised 25 in-store events with local suppliers.</li></ul> </article></section><section class="cv-section cv-edu"><h2>Education</h2> <article class="cv-entry"> <div class="cv-entry-top"><h3 class="cv-role">BA Marketing</h3><span class="cv-dates">2014 to 2017</span></div> <p class="cv-org"><span>University of Leeds</span>, <span>Leeds</span></p> <p class="cv-details">First-class honours. Final project on local brand loyalty.</p> </article></section><section class="cv-section"><h2>Skills</h2><ul class="cv-tags"><li>Campaign planning</li><li>Social media</li><li>Email marketing</li><li>Google Analytics</li><li>Budgeting</li><li>Team leadership</li></ul></section><section class="cv-section"><h2>Languages</h2><ul class="cv-tags"><li>English (native)</li><li>Yoruba (conversational)</li></ul></section><section class="cv-section"><h2>Certifications</h2><ul class="cv-bullets"><li>Google Analytics Certification, 2023</li><li>Meta Social Media Marketing, 2022</li></ul></section></div></div>
+            <div class="tname"><b>Folio</b><span>Use this</span></div>
+          </a>
+          <a class="tcard" href="builder.html?template=meridian" aria-label="Use the Meridian design">
+            <div class="mini" aria-hidden="true"><div class="cv tpl-meridian one has-photo" style="--cv-accent:#6B2A5E" lang="en"><header class="cv-head"><div class="cv-head-text"><h1 class="cv-name">Maya Okafor</h1><p class="cv-title">Marketing Manager</p><p class="cv-contact"><span>maya.okafor@email.com</span><span>+44 7700 900123</span><span>Manchester, UK</span><span>linkedin.com/in/mayaokafor</span></p></div><div class="cv-photo"><img src="assets/sample-photo.jpg" alt=""></div></header><section class="cv-section"><h2>Profile</h2><p class="cv-summary">Marketing manager with seven years in retail and food brands. I plan campaigns that people actually talk about, and I measure what works so the next one does better.</p></section><section class="cv-section cv-exp"><h2>Experience</h2> <article class="cv-entry"> <div class="cv-entry-top"><h3 class="cv-role">Marketing Manager</h3><span class="cv-dates">2021 to Present</span></div> <p class="cv-org"><span>Northfield Coffee Co.</span>, <span>Manchester</span></p> <ul class="cv-bullets"><li>Grew Instagram from 2,000 to 18,000 followers in one year with a weekly behind-the-counter series.</li><li>Led the launch of three seasonal drinks, each selling out in its first month.</li><li>Manage a team of four and a yearly budget of £120,000.</li></ul> </article> <article class="cv-entry"> <div class="cv-entry-top"><h3 class="cv-role">Marketing Coordinator</h3><span class="cv-dates">2018 to 2021</span></div> <p class="cv-org"><span>Greenway Stores</span>, <span>Leeds</span></p> <ul class="cv-bullets"><li>Ran email campaigns for 40,000 customers, lifting repeat orders by 12%.</li><li>Organised 25 in-store events with local suppliers.</li></ul> </article></section><section class="cv-section cv-edu"><h2>Education</h2> <article class="cv-entry"> <div class="cv-entry-top"><h3 class="cv-role">BA Marketing</h3><span class="cv-dates">2014 to 2017</span></div> <p class="cv-org"><span>University of Leeds</span>, <span>Leeds</span></p> <p class="cv-details">First-class honours. Final project on local brand loyalty.</p> </article></section><section class="cv-section"><h2>Skills</h2><ul class="cv-tags"><li>Campaign planning</li><li>Social media</li><li>Email marketing</li><li>Google Analytics</li><li>Budgeting</li><li>Team leadership</li></ul></section><section class="cv-section"><h2>Languages</h2><ul class="cv-tags"><li>English (native)</li><li>Yoruba (conversational)</li></ul></section><section class="cv-section"><h2>Certifications</h2><ul class="cv-bullets"><li>Google Analytics Certification, 2023</li><li>Meta Social Media Marketing, 2022</li></ul></section></div></div>
+            <div class="tname"><b>Meridian</b><span>Use this</span></div>
+          </a>
+          <a class="tcard" href="builder.html?template=ledger" aria-label="Use the Ledger design">
+            <div class="mini" aria-hidden="true"><div class="cv tpl-ledger one" style="--cv-accent:#A2412A" lang="en"><header class="cv-head"><div class="cv-head-text"><h1 class="cv-name">Maya Okafor</h1><p class="cv-title">Marketing Manager</p><p class="cv-contact"><span>maya.okafor@email.com</span><span>+44 7700 900123</span><span>Manchester, UK</span><span>linkedin.com/in/mayaokafor</span></p></div></header><section class="cv-section"><h2>Profile</h2><p class="cv-summary">Marketing manager with seven years in retail and food brands. I plan campaigns that people actually talk about, and I measure what works so the next one does better.</p></section><section class="cv-section cv-exp"><h2>Experience</h2> <article class="cv-entry"> <div class="cv-entry-top"><h3 class="cv-role">Marketing Manager</h3><span class="cv-dates">2021 to Present</span></div> <p class="cv-org"><span>Northfield Coffee Co.</span>, <span>Manchester</span></p> <ul class="cv-bullets"><li>Grew Instagram from 2,000 to 18,000 followers in one year with a weekly behind-the-counter series.</li><li>Led the launch of three seasonal drinks, each selling out in its first month.</li><li>Manage a team of four and a yearly budget of £120,000.</li></ul> </article> <article class="cv-entry"> <div class="cv-entry-top"><h3 class="cv-role">Marketing Coordinator</h3><span class="cv-dates">2018 to 2021</span></div> <p class="cv-org"><span>Greenway Stores</span>, <span>Leeds</span></p> <ul class="cv-bullets"><li>Ran email campaigns for 40,000 customers, lifting repeat orders by 12%.</li><li>Organised 25 in-store events with local suppliers.</li></ul> </article></section><section class="cv-section cv-edu"><h2>Education</h2> <article class="cv-entry"> <div class="cv-entry-top"><h3 class="cv-role">BA Marketing</h3><span class="cv-dates">2014 to 2017</span></div> <p class="cv-org"><span>University of Leeds</span>, <span>Leeds</span></p> <p class="cv-details">First-class honours. Final project on local brand loyalty.</p> </article></section><section class="cv-section"><h2>Skills</h2><ul class="cv-tags"><li>Campaign planning</li><li>Social media</li><li>Email marketing</li><li>Google Analytics</li><li>Budgeting</li><li>Team leadership</li></ul></section><section class="cv-section"><h2>Languages</h2><ul class="cv-tags"><li>English (native)</li><li>Yoruba (conversational)</li></ul></section><section class="cv-section"><h2>Certifications</h2><ul class="cv-bullets"><li>Google Analytics Certification, 2023</li><li>Meta Social Media Marketing, 2022</li></ul></section></div></div>
+            <div class="tname"><b>Ledger</b><span>Use this</span></div>
+          </a>
+        </div>
+      </div>
+      <p class="sample-note r">Samples show a made-up person. Yours will show you, and your photo.</p>
+    </section>
+
+    <section class="on-ink pad" id="pricing" data-reveal data-live aria-labelledby="price-title">
+      <div class="wrap price-grid">
+        <div class="zero r" aria-hidden="true">
+          <b>$0</b>
+          <svg class="stamp" viewBox="0 0 120 120"><defs><path id="arc" d="M60 60m-42 0a42 42 0 1 1 84 0a42 42 0 1 1-84 0"/></defs><circle cx="60" cy="60" r="56" fill="#C43D25"/><circle cx="60" cy="60" r="49" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="1.2"/><text fill="#fff" font-family="Spline Sans Mono, monospace" font-size="11.5" letter-spacing="3.2"><textPath href="#arc">FREE TO DOWNLOAD · NO CARD · </textPath></text><path d="M60 38C60 38 47 54 47 63a13 13 0 0 0 26 0C73 54 60 38 60 38z" fill="#fff"/></svg>
+        </div>
+        <div class="price-copy">
+          <p class="kicker r">Pricing</p>
+          <h2 class="h2 r" id="price-title">Free. Really.</h2>
+          <p class="lede r">Make as many CVs as you like, and download every one of them.</p>
+          <div class="compare r">
+            <div class="them"><h3>Many CV sites</h3><ul><li>Free to build, then pay to download</li><li>A $2.95 trial that turns into about $30 a month</li><li>A watermark on your PDF</li><li>Pay again to edit later</li></ul></div>
+            <div class="us"><h3>Inkline</h3><ul><li>Free to build and download</li><li>No trial and no card</li><li>No watermark</li><li>Edit whenever you like</li></ul></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="pad" id="questions" data-reveal aria-labelledby="faq-title">
+      <div class="wrap faq-grid">
+        <div class="faq-side">
+          <p class="kicker r">Questions</p>
+          <h2 class="h2 r" id="faq-title">Questions people ask.</h2>
+          <div class="yours r">
+            <h3>Your story stays yours.</h3>
+            <p>No account. Your CV is saved in your own browser, and Start over deletes it in one click.</p>
+          </div>
+        </div>
+        <div class="faq r">
+          <details><summary>Is Inkline really free?</summary><div class="ans"><p>Yes. Building, editing and downloading your CV costs nothing. There's no trial, no card and no watermark.</p></div></details>
+          <details><summary>Will my CV sound like a robot wrote it?</summary><div class="ans"><p>No. The AI writes from your own answers and keeps your way of saying things. You can change any word before you download.</p></div></details>
+          <details><summary>Can I upload my old CV?</summary><div class="ans"><p>Yes. Upload a PDF, a Word file or even a photo of it. The AI reads it, builds a fresh CV, then asks what has changed since, like a new job or new skills.</p></div></details>
+          <details><summary>Can I ask the AI questions while I make my CV?</summary><div class="ans"><p>Yes. Ask things like how long your CV should be, or how to explain a gap. It answers, then carries on with your CV. When you are done, it shows your CV in a few designs so you can pick one.</p></div></details>
+          <details><summary>Do I have to use the AI?</summary><div class="ans"><p>No. You can fill in any template yourself, like a simple form, and watch your CV update as you type. You can switch between the AI and the form at any time.</p></div></details>
+          <details><summary>Can I add my photo?</summary><div class="ans"><p>Yes. Upload a photo and it appears in every design with a photo spot. It stays in your browser and is never sent to the AI. In the US and UK, CVs usually leave the photo out. In much of Europe, the Middle East and Asia, employers often expect one.</p></div></details>
+          <details><summary>Will it get past hiring software?</summary><div class="ans"><p>For online application forms, choose a Classic design. They are one clean column of real text, the layout hiring software reads best. The colourful designs are made for emailing or handing in your CV, where a person reads it first.</p></div></details>
+          <details><summary>I don't have much work experience. Can I still make one?</summary><div class="ans"><p>Yes. The AI asks about school, volunteering, side projects, part-time work and skills, so a first CV still looks full and confident.</p></div></details>
+          <details><summary>What happens to my information?</summary><div class="ans"><p>Your CV is saved in your own browser, not in an account. While the AI is helping, your answers are sent to it only to write your CV. Start over deletes everything from your browser.</p></div></details>
+          <details><summary>Can I make my CV in another language?</summary><div class="ans"><p>Yes. Write to the AI in your language and it replies, and writes your CV, in that language too.</p></div></details>
+          <details><summary>Can I come back and edit it later?</summary><div class="ans"><p>Yes. Your CV stays saved in the browser you made it in. Open Inkline again and carry on where you left off.</p></div></details>
+        </div>
+      </div>
+    </section>
+
+    <section class="on-ink final" id="start" data-reveal aria-labelledby="final-title">
+      <div class="wrap">
+        <h2 class="h2 r" id="final-title">Your next job starts with one answer.</h2>
+        <p class="lede r">It takes about ten minutes.</p>
+        <div class="final-ctas r"><a class="btn" id="final-cta" href="builder.html?mode=ai"><span class="seal" aria-hidden="true"></span>Make it with AI</a><a class="btn-alt" href="builder.html?mode=form">Fill in a template</a></div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="foot">
+    <a class="brand" href="#top" aria-label="Inkline, back to top">
+      <svg viewBox="0 0 64 64" aria-hidden="true"><path d="M32 6C32 6 14 28 14 40a18 18 0 0 0 36 0C50 28 32 6 32 6z" fill="#E9EEF8"/><circle cx="40" cy="44" r="5" fill="#F06A4F"/></svg>
+      Inkline
+    </a>
+    <nav aria-label="Footer"><a href="#how">How it works</a><a href="#designs">Designs</a><a href="#pricing">Pricing</a><a href="#questions">Questions</a><a href="builder.html">Start my CV</a></nav>
+    <p>© 2026 Inkline. Your CV stays in your browser.</p>
+  </div>
+</footer>
+
+<script>
+(function () {
+  'use strict';
+  const $ = s => document.querySelector(s);
+  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+  const smoothstep = (p, e0, e1) => { const t = clamp((p - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t); };
+  const reduceMQ = matchMedia('(prefers-reduced-motion: reduce)');
+
+  // ---------- split headline text once, with seeded offsets so every load looks the same ----------
+  function rng(seed) { let s = seed >>> 0; return () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296; }
+  document.querySelectorAll('.split').forEach((el, n) => {
+    const text = el.textContent.trim();
+    const rand = rng(97 + n * 31);
+    const chars = el.classList.contains('chars');
+    const spread = parseFloat(el.closest('.band') && el.closest('.band').dataset.spread) || 0.55;
+    const words = text.split(' ');
+    const total = text.replace(/ /g, '').length;
+    let ci = 0;
+    const vis = document.createElement('span');
+    vis.setAttribute('aria-hidden', 'true');
+    words.forEach((word, wi) => {
+      const w = document.createElement('span');
+      w.className = 'w';
+      w.style.setProperty('--th', (wi / Math.max(1, words.length) * 0.5).toFixed(3));
+      if (chars) {
+        [...word].forEach(ch => {
+          const c = document.createElement('span');
+          c.className = 'c'; c.textContent = ch;
+          c.style.setProperty('--th', (rand() * spread).toFixed(3));
+          c.style.setProperty('--jx', ((rand() - .5) * 90).toFixed(1) + 'px');
+          c.style.setProperty('--jy', ((rand() - .5) * 70).toFixed(1) + 'px');
+          c.style.setProperty('--jr', ((rand() - .5) * 40).toFixed(1) + 'deg');
+          w.appendChild(c); ci++;
+        });
+      } else w.textContent = word;
+      vis.appendChild(w);
+      if (wi < words.length - 1) vis.appendChild(document.createTextNode(' '));
+    });
+    const sr = document.createElement('span');
+    sr.className = 'sr-only'; sr.textContent = text;
+    el.textContent = '';
+    el.append(sr, vis);
+  });
+
+  // ---------- the scrub hero ----------
+  const hero = $('#top'), stage = $('#stage'), canvas = $('#hero'), posterLayer = $('#poster'), ring = $('#ring'), cue = $('#cue');
+  // The footage plays as a sequence of still frames drawn to a canvas. Unlike seeking a video,
+  // this runs the same in every browser, forwards and backwards, including Safari.
+  const FRAME_COUNT = 96;
+  const frameSrc = i => `assets/frames/f${String(i + 1).padStart(3, '0')}.jpg`;
+  const ctx = canvas.getContext('2d');
+  const bands = [...document.querySelectorAll('.band')].map((el, i, all) => ({
+    el, a: parseFloat(el.dataset.a), b: parseFloat(el.dataset.b),
+    ramp: parseFloat(el.dataset.ramp) || 0, first: i === 0, last: i === all.length - 1, op: -1, k: -1, off: null
+  }));
+
+  function heroProgress() {
+    const range = hero.offsetHeight - innerHeight;
+    if (range <= 0) return 0;
+    return clamp(-hero.getBoundingClientRect().top / range, 0, 1);
+  }
+
+  let loadK = 0, loadStart = 0, lastDeep = -1;
+  const deepEl = $('#deep');
+  function updateCaptions(p) {
+    bands.forEach(bd => {
+      const { a, b } = bd;
+      const f = Math.min(0.02, (b - a) / 3);
+      const op = (bd.first ? 1 : smoothstep(p, a, a + f)) * (bd.last ? 1 : 1 - smoothstep(p, b - f, b));
+      let k = clamp((p - a) / (bd.ramp || Math.min(0.025, (b - a) * 0.35)), 0, 1);
+      if (bd.first) k = Math.max(k, loadK);
+      if (Math.abs(op - bd.op) > 0.004 || (op === 0) !== (bd.op === 0) || op === 1 && bd.op !== 1) { bd.el.style.opacity = op.toFixed(3); bd.op = op; }
+      if (Math.abs(k - bd.k) > 0.008 || (k === 1 && bd.k !== 1) || (k === 0 && bd.k !== 0)) { bd.el.style.setProperty('--k', k.toFixed(3)); bd.k = k; }
+      const off = op < 0.02;
+      if (off !== bd.off) { bd.el.classList.toggle('off', off); bd.off = off; }
+    });
+    const deep = smoothstep(p, 0.72, 1);
+    if (Math.abs(deep - lastDeep) > 0.004 || (deep === 1 && lastDeep !== 1) || (deep === 0 && lastDeep !== 0)) { deepEl.style.setProperty('--deep', deep.toFixed(3)); lastDeep = deep; }
+    const gone = p > 0.03;
+    if (gone !== cue.classList.contains('gone')) cue.classList.toggle('gone', gone);
+  }
+
+  // Band one assembles by itself on load, then hands over to scroll.
+  function loadRamp(now) {
+    if (!loadStart) loadStart = now;
+    loadK = clamp((now - loadStart - 250) / 1100, 0, 1);
+    loadK = 1 - Math.pow(1 - loadK, 3);
+    updateCaptions(scrubOn ? shown : heroProgress());
+    if (loadK < 1) requestAnimationFrame(loadRamp);
+  }
+
+  // drawing: show the frame for a progress value, or the nearest frame loaded so far
+  const frames = new Array(FRAME_COUNT);
+  let loadedCount = 0, lastDrawn = -1;
+  function nearestLoaded(i) {
+    if (frames[i]) return i;
+    for (let d = 1; d < FRAME_COUNT; d++) {
+      if (i - d >= 0 && frames[i - d]) return i - d;
+      if (i + d < FRAME_COUNT && frames[i + d]) return i + d;
+    }
+    return -1;
+  }
+  function drawFrame(p) {
+    const i = nearestLoaded(Math.round(clamp(p, 0, 1) * (FRAME_COUNT - 1)));
+    if (i < 0 || i === lastDrawn || !canvas.width) return;
+    const img = frames[i], cw = canvas.width, ch = canvas.height;
+    const s = Math.max(cw / img.naturalWidth, ch / img.naturalHeight);   // cover, like object-fit
+    const w = img.naturalWidth * s, h = img.naturalHeight * s;
+    ctx.drawImage(img, (cw - w) / 2, (ch - h) / 2, w, h);
+    lastDrawn = i;
+  }
+  function sizeCanvas() {
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const w = Math.round(stage.clientWidth * dpr), h = Math.round(stage.clientHeight * dpr);
+    if (canvas.width === w && canvas.height === h) return;
+    canvas.width = w; canvas.height = h;
+    ctx.imageSmoothingQuality = 'high';
+    lastDrawn = -1;
+    drawFrame(scrubOn ? shown : heroProgress());
+  }
+  let sizeT = null;
+  addEventListener('resize', () => { clearTimeout(sizeT); sizeT = setTimeout(() => { if (scrubOn) sizeCanvas(); }, 100); });
+
+  // eased display time, a loop that rests when it arrives
+  let target = 0, shown = 0, rafId = null, lastTick = 0, heroOnScreen = true;
+  function tick(now) {
+    const dt = Math.min(100, now - (lastTick || now));
+    lastTick = now;
+    const k = 0.16;
+    shown += (target - shown) * (1 - Math.pow(1 - k, dt / 16.667));
+    if (Math.abs(target - shown) < 0.0005) { shown = target; rafId = null; lastTick = 0; }
+    else rafId = requestAnimationFrame(tick);
+    drawFrame(shown);
+    updateCaptions(shown);
+  }
+  function onScroll() {
+    target = heroProgress();
+    if (rafId === null && heroOnScreen) rafId = requestAnimationFrame(tick);
+  }
+  new IntersectionObserver(es => { heroOnScreen = es[0].isIntersecting; if (heroOnScreen && scrubOn) onScroll(); }).observe(hero);
+
+  // loading: the poster paints first, then frames arrive coarse to fine (every 32nd, 16th, 8th...),
+  // so scrubbing works early and gets smoother as the rest land, behind an honest ring
+  let heroInit = false;
+  function initHeroOnce() {
+    if (heroInit) return; heroInit = true;
+    posterLayer.style.backgroundImage = "url('assets/hero-poster.jpg')";
+    sizeCanvas();
+    loadFrames();
+  }
+  function loadOrder() {
+    const seen = new Set(), order = [];
+    const add = i => { if (!seen.has(i)) { seen.add(i); order.push(i); } };
+    add(0); add(FRAME_COUNT - 1);
+    [32, 16, 8, 4, 2, 1].forEach(step => { for (let i = 0; i < FRAME_COUNT; i += step) add(i); });
+    return order;
+  }
+  async function loadFrames() {
+    const order = loadOrder();
+    let next = 0, lastRing = 0;
+    const worker = async () => {
+      while (next < order.length) {
+        const i = order[next++];
+        const img = new Image();
+        img.decoding = 'async';
+        img.src = frameSrc(i);
+        try { await img.decode(); } catch (e) { continue; }
+        frames[i] = img;
+        loadedCount++;
+        if (!stage.classList.contains('ready')) { stage.classList.add('ready'); sizeCanvas(); }
+        lastDrawn = -1;
+        drawFrame(scrubOn ? shown : heroProgress());
+        const now = performance.now();
+        if (now - lastRing > 100 || loadedCount === FRAME_COUNT) {
+          lastRing = now;
+          ring.style.setProperty('--ld', Math.round(126 * (1 - loadedCount / FRAME_COUNT)));
+        }
+      }
+    };
+    await Promise.all([0, 1, 2, 3, 4, 5].map(worker));
+    if (!loadedCount) failFrames();
+    else stage.classList.add('loaded');
+  }
+  function failFrames() {
+    stage.classList.add('frames-failed');
+    ring.style.display = 'none';
+  }
+
+  // the five static-hero gates, kept live
+  const GATES = [
+    '(max-width: 720px)',
+    '(orientation: portrait) and (max-width: 1024px)',
+    '(orientation: portrait) and (pointer: coarse)',
+    '(orientation: landscape) and (pointer: coarse) and (max-height: 560px)',
+    '(prefers-reduced-motion: reduce)'
+  ];
+  let scrubOn = false;
+  function enableScrub() {
+    if (scrubOn) return; scrubOn = true;
+    initHeroOnce();
+    addEventListener('scroll', onScroll, { passive: true });
+    bands.forEach(b => { b.op = -1; b.k = -1; b.off = null; });
+    unpinFinalStates();
+    shown = target = heroProgress();
+    updateCaptions(shown);
+    onScroll();
+  }
+  function disableScrub() {
+    if (!scrubOn) return; scrubOn = false;
+    removeEventListener('scroll', onScroll);
+    if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null; }
+  }
+  function applyHeroMode() {
+    if (GATES.some(q => matchMedia(q).matches)) disableScrub(); else enableScrub();
+  }
+  const MQLS = GATES.map(q => matchMedia(q));
+  MQLS.forEach(m => m.addEventListener('change', applyHeroMode));
+
+  // ---------- reveals and living elements ----------
+  const revealIO = new IntersectionObserver(es => es.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.classList.add('in');
+      setTimeout(() => e.target.classList.add('settled'), 1400);
+      revealIO.unobserve(e.target);
+    }
+  }), { threshold: 0.12, rootMargin: '0px 0px -8% 0px' });
+  document.querySelectorAll('[data-reveal]').forEach(el => revealIO.observe(el));
+  const liveIO = new IntersectionObserver(es => es.forEach(e => {
+    e.target.classList.toggle('live', e.isIntersecting);
+    e.target.querySelectorAll('.price-grid').forEach(g => g.classList.toggle('live', e.isIntersecting));
+  }));
+  document.querySelectorAll('[data-live]').forEach(el => liveIO.observe(el));
+  document.addEventListener('visibilitychange', () => document.body.classList.toggle('paused', document.hidden));
+
+  // ---------- the inkline: one ink line drawn down the page as you scroll ----------
+  const wrapEl = $('#after-hero'), trail = $('#trail'), path = $('#trail-path'), tip = $('#trail-tip');
+  let pathLen = 0, lut = [], lastDraw = -1, trailOn = false;
+  function buildTrail() {
+    trailOn = innerWidth > 1100;
+    if (!trailOn) return;
+    const W = wrapEl.offsetWidth, H = wrapEl.offsetHeight;
+    trail.setAttribute('width', W); trail.setAttribute('height', H);
+    trail.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    const container = Math.min(1180, W);
+    const gutterX = Math.max(26, (W - container) / 2 * 0.5);
+    const L = gutterX, R = W - gutterX, C = W / 2;
+    const base = wrapEl.getBoundingClientRect();
+    const rect = el => { const r = el.getBoundingClientRect(); return { x: r.left - base.left, y: r.top - base.top, w: r.width, h: r.height }; };
+    const sec = id => rect(document.getElementById(id));
+    const how = sec('how'), tryS = sec('try'), des = sec('designs'), pri = sec('pricing'), faq = sec('questions');
+    const btn = rect($('#final-cta'));
+    const btnY = btn.y + btn.h / 2;
+    // The line continues the ink thread from the video, swoops into the gutter inside the
+    // section padding, crosses sides only in the gaps between sections, and ends at the button.
+    const pts = [
+      [C, 0], [L, 110],
+      [L, how.y + how.h - 120],
+      [R, tryS.y + 120], [R, des.y + des.h - 90],
+      [L, pri.y + 130], [L, btnY - 140],
+      [btn.x - 14, btnY]
+    ];
+    // smooth curve through the points (vertical tangents keep it flowing downward)
+    let d = `M${pts[0][0]},${pts[0][1]}`;
+    for (let i = 1; i < pts.length; i++) {
+      const [x0, y0] = pts[i - 1], [x1, y1] = pts[i];
+      if (i === pts.length - 1) {
+        // the last stroke turns and arrives level with the button, under the text above it
+        d += ` C${x0},${y1 - 10} ${x1 - 160},${y1} ${x1},${y1}`;
+        continue;
+      }
+      const dy = (y1 - y0) * 0.5;
+      d += ` C${x0},${y0 + dy} ${x1},${y1 - dy} ${x1},${y1}`;
+    }
+    path.setAttribute('d', d);
+    pathLen = path.getTotalLength();
+    path.style.strokeDasharray = pathLen;
+    lut = [];
+    const N = 400;
+    for (let i = 0; i <= N; i++) { const l = pathLen * i / N; lut.push([l, path.getPointAtLength(l).y]); }
+    lastDraw = -1;
+    drawTrail();
+  }
+  function lengthAtY(y) {
+    if (y <= lut[0][1]) return 0;
+    let lo = 0, hi = lut.length - 1;
+    if (y >= lut[hi][1]) return pathLen;
+    while (hi - lo > 1) { const m = (lo + hi) >> 1; if (lut[m][1] < y) lo = m; else hi = m; }
+    const [l0, y0] = lut[lo], [l1, y1] = lut[hi];
+    return l0 + (l1 - l0) * ((y - y0) / Math.max(1, y1 - y0));
+  }
+  let trailRaf = null;
+  function drawTrail() {
+    trailRaf = null;
+    if (!trailOn || !pathLen) return;
+    const full = reduceMQ.matches;
+    // the drawing head leads at 72% of the screen, and reaches past the end as the page bottoms out
+    const remaining = document.documentElement.scrollHeight - scrollY - innerHeight;
+    const nearEnd = clamp(1 - remaining / 500, 0, 1);
+    const headY = scrollY + innerHeight * (0.72 + 0.5 * nearEnd) - (wrapEl.getBoundingClientRect().top + scrollY);
+    const l = full ? pathLen : lengthAtY(headY);
+    if (Math.abs(l - lastDraw) < 0.5) return;
+    lastDraw = l;
+    path.style.strokeDashoffset = (pathLen - l).toFixed(1);
+    const pt = path.getPointAtLength(Math.max(0.01, l));
+    tip.setAttribute('cx', pt.x.toFixed(1)); tip.setAttribute('cy', pt.y.toFixed(1));
+    tip.style.opacity = l <= 1 || l >= pathLen - 1 ? 0 : 1;
+    const lit = l >= pathLen - 1;
+    if (lit !== $('#start').classList.contains('lit')) $('#start').classList.toggle('lit', lit);
+  }
+  addEventListener('scroll', () => { if (trailRaf === null) trailRaf = requestAnimationFrame(drawTrail); }, { passive: true });
+  let rT = null;
+  addEventListener('resize', () => { clearTimeout(rT); rT = setTimeout(buildTrail, 150); });
+  new ResizeObserver(() => { clearTimeout(rT); rT = setTimeout(buildTrail, 150); }).observe(wrapEl);
+
+  // ---------- try it: press and hold to rewrite ----------
+  const EXAMPLES = [
+    { ctx: 'Social media assistant · Bloom Florists', before: 'Responsible for social media.', after: 'Grew our Instagram from 2,000 to 18,000 followers in one year.' },
+    { ctx: 'Barista · Corner Café', before: 'Worked on the coffee machine and the till.', after: 'Served 250 customers a day and trained four new baristas.' },
+    { ctx: 'Retail assistant · City Books', before: 'Helped with customer complaints.', after: 'Solved about 30 customer problems a week, so fewer people asked for refunds.' }
+  ];
+  const paper = $('#paper'), holdBtn = $('#hold'), afterEl = $('#after');
+  let ex = 0, prog = 0, holding = false, holdRaf = null, holdLast = 0, complete = false, lastP = -1;
+  function setExample(i) {
+    const e = EXAMPLES[i];
+    $('#ctx').textContent = e.ctx;
+    $('#before').textContent = e.before;
+    $('#after-sr').textContent = '';
+    afterEl.textContent = '';
+    const chars = [...e.after];
+    chars.forEach((ch, n) => {
+      const c = document.createElement('span');
+      c.className = 'c'; c.textContent = ch === ' ' ? ' ' : ch;
+      c.style.setProperty('--th', (0.3 + n / Math.max(1, chars.length - 1) * 0.5).toFixed(3));   // the last letter lands exactly at full hold
+      afterEl.appendChild(c);
+    });
+    complete = false; prog = 0; lastP = -1;
+    paper.classList.remove('done');
+    $('#hold-label').textContent = 'Hold to rewrite';
+    writeP(reduceMQ.matches ? 1 : 0);
+    if (reduceMQ.matches) finish();
+  }
+  function writeP(p) {
+    if (Math.abs(p - lastP) < 0.004 && p !== 1 && p !== 0) return;
+    lastP = p;
+    paper.style.setProperty('--p', p.toFixed(3));
+    holdBtn.style.setProperty('--p', p.toFixed(3));
+  }
+  function finish() {
+    complete = true;
+    paper.classList.add('done');
+    $('#after-sr').textContent = 'Rewritten: ' + EXAMPLES[ex].after;
+    $('#hold-label').textContent = 'Rewritten';
+  }
+  function holdTick(now) {
+    const dt = Math.min(64, now - (holdLast || now)); holdLast = now;
+    if (holding && !complete) prog = Math.min(1, prog + dt / 1500);
+    else if (!complete) prog = Math.max(0, prog - dt / 700 * (0.4 + prog));
+    writeP(prog);
+    if (prog >= 1 && !complete) finish();
+    if ((holding && !complete) || (!complete && prog > 0)) holdRaf = requestAnimationFrame(holdTick);
+    else { holdRaf = null; holdLast = 0; }
+  }
+  function startHold(e) {
+    if (e) e.preventDefault();
+    if (complete) return;
+    if (reduceMQ.matches) { writeP(1); finish(); return; }
+    holding = true;
+    if (!holdRaf) holdRaf = requestAnimationFrame(holdTick);
+  }
+  function endHold() {
+    holding = false;
+    if (!holdRaf && !complete && prog > 0) holdRaf = requestAnimationFrame(holdTick);
+  }
+  holdBtn.addEventListener('pointerdown', e => { holdBtn.setPointerCapture && holdBtn.setPointerCapture(e.pointerId); startHold(e); });
+  holdBtn.addEventListener('pointerup', endHold);
+  holdBtn.addEventListener('pointercancel', endHold);
+  holdBtn.addEventListener('lostpointercapture', endHold);
+  holdBtn.addEventListener('keydown', e => { if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) startHold(e); });
+  holdBtn.addEventListener('keyup', e => { if (e.key === ' ' || e.key === 'Enter') endHold(); });
+  holdBtn.addEventListener('contextmenu', e => e.preventDefault());
+  $('#next').addEventListener('click', () => { ex = (ex + 1) % EXAMPLES.length; setExample(ex); holdBtn.focus(); });
+  setExample(0);
+
+  // ---------- in-page links: jump by script so they work in every browser and preview ----------
+  document.addEventListener('click', e => {
+    const a = e.target.closest('a[href^="#"]');
+    if (!a || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey) return;
+    const id = a.getAttribute('href').slice(1);
+    const t = id && document.getElementById(id);
+    if (!t) return;
+    e.preventDefault();
+    const y = id === 'top' || id === 'main' ? 0 : t.getBoundingClientRect().top + scrollY - 84;
+    window.scrollTo(0, Math.max(0, y));
+    if (!t.hasAttribute('tabindex')) t.setAttribute('tabindex', '-1');
+    t.focus({ preventScroll: true });
+    try { history.replaceState(null, '', '#' + id); } catch (err) { /* some previews block this */ }
+  });
+
+  // ---------- reduced motion, honoured live in both directions ----------
+  function pinToFinalStates() {
+    lastDraw = -1; drawTrail();
+    if (!complete) { writeP(1); finish(); }
+    document.querySelectorAll('[data-reveal]').forEach(el => el.classList.add('in', 'settled'));
+  }
+  function unpinFinalStates() {
+    lastDraw = -1; drawTrail();
+  }
+  reduceMQ.addEventListener('change', e => {
+    if (e.matches) pinToFinalStates();
+    else { applyHeroMode(); setExample(ex); }
+  });
+
+  // ---------- go ----------
+  applyHeroMode();
+  if (!scrubOn) updateCaptions(0);
+  requestAnimationFrame(loadRamp);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(buildTrail); else buildTrail();
+  addEventListener('load', buildTrail);
+  if (reduceMQ.matches) pinToFinalStates();
+})();
+</script>
+</body>
+</html>
