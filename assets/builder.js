@@ -907,7 +907,7 @@
   function guidedTurn(text) {
     if (looksLikeQuestion(text)) {
       const hit = FAQ.find(([re]) => re.test(text));
-      bubble('ai', hit ? hit[1] : "Good question. Once the AI is switched on I can answer questions about anything. For now I can help with common CV questions, so let's keep building your CV.");
+      bubble('ai', hit ? hit[1] : "I can help with questions about your CV, like how long it should be or how to explain a gap. Let's keep building your CV.");
       if (state.guided.step !== 'review') askGuided();
       return;
     }

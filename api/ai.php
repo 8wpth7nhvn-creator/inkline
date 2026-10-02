@@ -124,6 +124,16 @@ if ($action === 'chat') {
         $history[] = ['role' => 'user', 'content' => $content];
         $r = ai_call(chat_system_prompt(), $history, chat_schema());
         if (!$r['ok']) return ['failed' => $r];
+        // CV topics only. If the AI marks a message as off topic, whatever it wrote is thrown away:
+        // the visitor gets a fixed reply, the CV stays as it was, and the off-topic text never
+        // enters the conversation. So the AI can't be used as a free general chatbot, even if tricked.
+        $r['off_topic'] = ($r['json']['topic'] ?? 'cv') !== 'cv';
+        if ($r['off_topic']) {
+            $r['json'] = ['reply' => "I can only help with your CV here, so I can't answer that. Shall we carry on with your CV?",
+                'quick_replies' => ['Carry on with my CV', 'Show me designs'], 'stage' => $r['json']['stage'] ?? 'basics',
+                'show_designs' => false, 'suggested_templates' => [], 'topic' => 'off_topic', 'cv' => normalize_cv($lastCv)];
+            $r['assistant'] = json_encode($r['json'], JSON_UNESCAPED_UNICODE);
+        }
         $history[] = ['role' => 'assistant', 'content' => $r['assistant']];
         $conv['history'] = $history;
         $conv['turns'] = (int)$conv['turns'] + 1;
@@ -136,6 +146,7 @@ if ($action === 'chat') {
     }
     if (!empty($result['failed'])) ai_failed($result['failed'], 'chat');
     $r = $result['r'];
+    if (!empty($r['off_topic'])) log_event('off_topic', ['action' => 'chat', 'turn' => $result['turn']]);
     log_event('request_ok', ['action' => 'chat', 'provider' => $S['provider'], 'model' => $S['model'], 'latency_ms' => $r['latency_ms'],
         'input_tokens' => $r['input_tokens'], 'output_tokens' => $r['output_tokens'], 'turn' => $result['turn']]);
     json_out(200, ['ok' => true, 'data' => clean_ai_reply($r['json'])]);
