@@ -446,7 +446,7 @@
     formEl.innerHTML = `
       <div class="card">
         <h2>Start from your old CV</h2>
-        <p class="sub">Upload a PDF, Word file or a photo of it. ${state.mode === 'guided' ? 'Without the AI switched on, only your contact details can be read.' : 'The AI reads it and fills in your new CV, then asks what has changed.'}</p>
+        <p class="sub">${state.mode === 'guided' ? 'Upload a PDF or Word file. It is read right here in your browser, never sent anywhere, and fills in your new CV.' : 'Upload a PDF, Word file or a photo of it. The AI reads it and fills in your new CV, then asks what has changed.'}</p>
         <button type="button" class="ghost" data-act="import-cv">Upload my old CV</button>
       </div>
 
@@ -809,7 +809,7 @@
 
   function switchToGuided() {
     setMode('guided');
-    state.guided = { step: firstMissingStep(), expIndex: state.cv.experience.length - 1, eduIndex: state.cv.education.length - 1 };
+    state.guided = { step: firstMissingStep(), expIndex: state.cv.experience.length - 1, eduIndex: state.cv.education.length - 1, gaps: true, done: [] };
     save();
     askGuided();
   }
@@ -863,12 +863,13 @@
     link:     { stage: 'contact', ask: () => 'Do you have a LinkedIn page or website to add?', quick: ['No'] },
     photo:    { stage: 'contact', ask: () => 'Would you like a photo on your CV? Many of the colourful designs have a photo spot.', quick: ['Add a photo', 'No photo'] },
     expHas:   { stage: 'experience', ask: () => 'Have you had any jobs? Part-time, summer and volunteer work all count.', quick: ['Yes', 'Not yet'] },
-    expRole:  { stage: 'experience', ask: g => g.expIndex < 0 ? "Let's start with your most recent job. What was your job title?" : 'What was the job title?' },
+    expRole:  { stage: 'experience', ask: g => g.updating && !g.addJob ? "What's the job title of your new job?" : g.expIndex < 0 ? "Let's start with your most recent job. What was your job title?" : 'What was the job title?' },
     expOrg:   { stage: 'experience', ask: () => "Where did you work? The company name and city, like 'Greenway Stores, Leeds'." },
     expDates: { stage: 'experience', ask: () => "When did you start and finish? For example '2021 to now' or 'Mar 2019 to Jun 2021'." },
     expWhat:  { stage: 'experience', ask: () => 'What did you do there? Tell me two or three things, each on a new line. Numbers help, like how many customers you served or how much sales grew.' },
+    oldEnd:   { stage: 'experience', ask: g => { const j = state.cv.experience[g.oldIndex] || {}; return `Your old CV says you still work${j.company ? ' at ' + j.company : ' in your last job'}. When did that job end? For example 'Dec 2024'.`; }, quick: ['I still work there'] },
     expMore:  { stage: 'experience', ask: () => 'Do you want to add another job?', quick: ['Add another job', "That's all"] },
-    eduQual:  { stage: 'education', ask: () => "What's your highest qualification? For example 'BA Marketing' or 'High school diploma'.", quick: ['Skip'] },
+    eduQual:  { stage: 'education', ask: g => g.updating ? "What's the new qualification? For example 'BA Marketing' or 'First aid certificate'." : "What's your highest qualification? For example 'BA Marketing' or 'High school diploma'.", quick: ['Skip'] },
     eduSchool:{ stage: 'education', ask: () => 'Where did you study? The school name and city.' },
     eduDates: { stage: 'education', ask: () => "When did you study there? For example '2014 to 2017'." },
     eduMore:  { stage: 'education', ask: () => 'Add another qualification?', quick: ['Add another', "That's all"] },
@@ -876,19 +877,17 @@
     languages:{ stage: 'skills', ask: () => 'Which languages do you speak, and how well?', quick: ['Just English', 'Skip'] },
     extras:   { stage: 'extras', ask: () => 'Anything else worth adding? Certifications, volunteering, projects or awards. Put each on a new line.', quick: ['Skip'] },
     summary:  { stage: 'extras', ask: () => 'Last one. In a sentence or two, what makes you good at this kind of work?', quick: ['Write one for me'] },
+    whatsNew: { stage: 'review', ask: g => g.addJob || g.addEdu ? 'Anything else that has changed?' : 'What has changed since you wrote it? I can add a new job or qualification for you. For anything else, click the text on your CV and type.', quick: ['Add a new job', 'Add a qualification', 'Nothing else'] },
     review:   { stage: 'review', ask: () => 'Your CV is ready. Here it is in a few designs. Tap the one you like, and you can still change anything afterwards.', quick: [{ label: 'See all 11 designs', act: 'picker' }, { label: 'Edit it myself', act: 'form' }, 'Start a new CV'], after: () => designsBubble(suggestedFor()) }
   };
 
-  function firstMissingStep() {
-    const c = state.cv;
-    if (!c.name) return 'name';
-    if (!c.title) return 'title';
-    if (!c.email && !c.phone) return 'email';
-    if (!c.experience.length) return 'expHas';
-    if (!c.education.length) return 'eduQual';
-    if (!c.skills.length) return 'skills';
-    if (!c.summary) return 'summary';
-    return 'review';
+  const MISSING = {
+    name: c => !c.name, title: c => !c.title, email: c => !c.email && !c.phone, expHas: c => !c.experience.length,
+    eduQual: c => !c.education.length, skills: c => !c.skills.length, summary: c => !c.summary
+  };
+  const MAIN_STEPS = ['name', 'title', 'email', 'phone', 'location', 'link', 'photo', 'expHas', 'eduQual', 'skills', 'languages', 'extras', 'summary', 'review'];
+  function firstMissingStep(done) {
+    return Object.keys(MISSING).find(k => !(done || []).includes(k) && MISSING[k](state.cv)) || 'review';
   }
 
   function askGuided() {
@@ -912,7 +911,14 @@
       return;
     }
     const g = state.guided, c = state.cv, skip = isSkip(text);
-    const go = step => { g.step = step; state.edited = true; renderCV(true); save(); askGuided(); };
+    const go = step => {
+      if (g.gaps && MAIN_STEPS.includes(step)) {
+        g.done = g.done || [];
+        if (MAIN_STEPS.includes(g.step) && !g.done.includes(g.step)) g.done.push(g.step);
+        step = firstMissingStep(g.done);
+      }
+      g.step = step; state.edited = true; renderCV(true); save(); askGuided();
+    };
     switch (g.step) {
       case 'name': if (!skip) c.name = titleCase(text); return go('title');
       case 'title': if (!skip) c.title = titleCase(text); return go('email');
@@ -922,22 +928,43 @@
       case 'link': if (!skip) c.link = text.trim().replace(/^https?:\/\/(www\.)?/i, ''); return go(state.photo ? 'expHas' : 'photo');
       case 'photo': if (/add/i.test(text)) pickPhoto(); return go('expHas');
       case 'expHas': return go(skip || /^not/i.test(text) ? 'eduQual' : 'expRole');
-      case 'expRole':
-        c.experience.push({ role: titleCase(text), company: '', location: '', start: '', end: '', bullets: [] });
-        g.expIndex = c.experience.length - 1;
+      case 'expRole': {
+        const job = { role: titleCase(text), company: '', location: '', start: '', end: '', bullets: [] };
+        // New jobs since the old CV go at the top, newest first
+        if (g.updating) { g.expIndex = g.addJob || 0; c.experience.splice(g.expIndex, 0, job); g.addJob = g.expIndex + 1; }
+        else { c.experience.push(job); g.expIndex = c.experience.length - 1; }
         return go('expOrg');
+      }
       case 'expOrg': { const [co, city] = placeAndCity(text); Object.assign(c.experience[g.expIndex], { company: co, location: titleCase(city) }); return go('expDates'); }
       case 'expDates': { const [a, b] = parseDates(text); Object.assign(c.experience[g.expIndex], { start: a, end: b }); return go('expWhat'); }
-      case 'expWhat': if (!skip) c.experience[g.expIndex].bullets = splitLines(text).map(tidy).filter(Boolean).slice(0, 6); return go('expMore');
-      case 'expMore': return go(/another|yes|add/i.test(text) ? 'expRole' : 'eduQual');
-      case 'eduQual':
-        if (skip) return go('skills');
-        c.education.push({ qualification: titleCase(text), school: '', location: '', start: '', end: '', details: '' });
-        g.eduIndex = c.education.length - 1;
+      case 'expWhat': {
+        if (!skip) c.experience[g.expIndex].bullets = splitLines(text).map(tidy).filter(Boolean).slice(0, 6);
+        // after a new job, an old one still marked "Present" has probably ended
+        const older = g.updating ? c.experience.findIndex((x, i) => i >= (g.addJob || 0) && /^present$/i.test(x.end)) : -1;
+        if (older >= 0 && !g.askedOld) { g.oldIndex = older; g.askedOld = true; return go('oldEnd'); }
+        return go('expMore');
+      }
+      case 'oldEnd':
+        if (!skip && !/still|yes|both/i.test(text) && c.experience[g.oldIndex]) c.experience[g.oldIndex].end = parseDates(text)[0];
+        return go('expMore');
+      case 'expMore': return go(/another|yes|add/i.test(text) ? 'expRole' : g.updating ? 'whatsNew' : 'eduQual');
+      case 'eduQual': {
+        if (skip) return go(g.updating ? 'whatsNew' : 'skills');
+        const study = { qualification: titleCase(text), school: '', location: '', start: '', end: '', details: '' };
+        if (g.updating) { g.eduIndex = g.addEdu || 0; c.education.splice(g.eduIndex, 0, study); g.addEdu = g.eduIndex + 1; }
+        else { c.education.push(study); g.eduIndex = c.education.length - 1; }
         return go('eduSchool');
+      }
       case 'eduSchool': { const [s, city] = placeAndCity(text); Object.assign(c.education[g.eduIndex], { school: s, location: titleCase(city) }); return go('eduDates'); }
       case 'eduDates': { const [a, b] = parseDates(text); Object.assign(c.education[g.eduIndex], { start: a, end: b }); return go('eduMore'); }
-      case 'eduMore': return go(/another|yes|add/i.test(text) ? 'eduQual' : 'skills');
+      case 'eduMore': return go(/another|yes|add/i.test(text) ? 'eduQual' : g.updating ? 'whatsNew' : 'skills');
+      case 'whatsNew':
+        if (skip || /^(no|nope|nothing|none|same|done)\b|that'?s all|show (me )?(the )?designs/i.test(text)) { g.updating = false; return go('review'); }
+        if (/job|work|position|role|employ|promot/i.test(text)) { g.updating = true; return go('expRole'); }
+        if (/qualif|degree|diploma|course|certif|stud|school|educat|training/i.test(text)) { g.updating = true; return go('eduQual'); }
+        bubble('ai', "To add it, press Add a new job or Add a qualification and I'll ask for the details. For anything else, click the text on your CV and type.");
+        setQuick(G.whatsNew.quick); save();
+        return;
       case 'skills': if (!skip) c.skills = splitList(text).map(capFirst).slice(0, 20); return go('languages');
       case 'languages': if (/just english/i.test(text)) c.languages = ['English']; else if (!skip) c.languages = splitList(text).map(capFirst); return go('extras');
       case 'extras': if (!skip) c.extras = [{ heading: 'Highlights', items: splitLines(text).map(tidy).filter(Boolean) }]; return go('summary');
@@ -1049,18 +1076,25 @@
   function rtfText(raw) {
     // Drop header groups (fonts, colours, styles, document info and \* destinations), keep the body text.
     const skip = /^\\(\*|fonttbl|colortbl|stylesheet|info|listtable|listoverridetable|generator|themedata|datastore|latentstyles|rsidtbl|xmlnstbl|pict)/;
+    // Accented letters are stored as code page bytes (\'e9); read them with the file's own code page
+    let decoder;
+    try { decoder = new TextDecoder('windows-' + ((raw.match(/\\ansicpg(\d+)/) || [])[1] || '1252')); } catch (e) { decoder = new TextDecoder('windows-1252'); }
+    // A backslash at the end of a line is a paragraph break; other line breaks in the file mean nothing
+    raw = raw.replace(/\\\r?\n/g, '\\par ').replace(/[\r\n]+/g, '');
     let out = '', depth = 0, skipDepth = -1;
     for (let k = 0; k < raw.length; k++) {
       const ch = raw[k];
+      if (ch === '\\' && /[{}\\]/.test(raw[k + 1] || '')) { if (skipDepth < 0) out += ch + raw[k + 1]; k++; continue; }
       if (ch === '{') { depth++; if (skipDepth < 0 && skip.test(raw.slice(k + 1, k + 20))) skipDepth = depth; continue; }
       if (ch === '}') { if (depth === skipDepth) skipDepth = -1; depth--; continue; }
       if (skipDepth < 0) out += ch;
     }
     return out
-      .replace(/\\par[d]?\b/g, '\n').replace(/\\line\b/g, '\n').replace(/\\tab\b/g, '\t')
-      .replace(/\\'([0-9a-f]{2})/gi, (m, h) => String.fromCharCode(parseInt(h, 16)))
-      .replace(/\\u(-?\d+)\??/g, (m, n) => String.fromCharCode(n < 0 ? +n + 65536 : +n))
-      .replace(/\\[a-z]+-?\d* ?/gi, '').replace(/\\[{}\\]/g, '')
+      .replace(/\\(par|row)\b ?/g, '\n').replace(/\\line\b ?/g, '\n').replace(/\\(tab|cell)\b ?/g, '\t')
+      .replace(/\\u(-?\d+) ?(?:\\'[0-9a-f]{2}|\?)?/gi, (m, n) => String.fromCharCode(n < 0 ? +n + 65536 : +n))
+      .replace(/(?:\\'[0-9a-f]{2})+/gi, m => decoder.decode(new Uint8Array(m.match(/[0-9a-f]{2}/gi).map(h => parseInt(h, 16)))))
+      .replace(/\\~/g, ' ').replace(/\\_/g, '-').replace(/\\-/g, '')
+      .replace(/\\[a-z]+-?\d* ?/gi, '').replace(/\\([{}\\])/g, '$1')
       .replace(/[ \t]+\n/g, '\n').replace(/\n[ \t]+/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
   }
 
@@ -1146,11 +1180,15 @@
     d.innerHTML = t;   // decodes &amp; and friends without running anything
     return d.value.replace(/\n{3,}/g, '\n\n').trim();
   }
-  async function pdfText(file) {
+  async function loadPdfjs() {
     // Served from this site (not a CDN), so no outside server can ever change the code that runs here.
     const base = new URL('assets/vendor/', location.href).href;
     const pdfjs = await import(base + 'pdf.min.mjs');
     pdfjs.GlobalWorkerOptions.workerSrc = base + 'pdf.worker.min.mjs';
+    return pdfjs;
+  }
+  async function pdfText(file) {
+    const pdfjs = await loadPdfjs();
     const doc = await pdfjs.getDocument({ data: await file.arrayBuffer(), isEvalSupported: false }).promise;
     let out = '';
     for (let n = 1; n <= Math.min(doc.numPages, 6); n++) {
@@ -1172,7 +1210,7 @@
     bubble('me', 'Uploaded my old CV: ' + files.map(f => f.name).join(', '));
     const unknown = files.find(f => !fileKind(f));
     if (unknown) {
-      bubble('ai', `I can't open "${unknown.name}" yet. PDF, Word, Pages, OpenDocument, RTF, text files and photos of a CV all work. If it's another kind, try saving it as a PDF.`);
+      bubble('ai', `I can't open "${unknown.name}". PDF, Word, OpenDocument, RTF and text files all work${state.mode === 'ai' ? ', and so do Pages files and photos of a CV' : ''}. If it's another kind, try saving it as a PDF.`);
       return;
     }
     if (state.mode === 'ai') await importWithAI(files);
@@ -1231,42 +1269,71 @@
     save();
   }
 
-  // Without the AI: pick out what can be found reliably (contact details and the name), then ask the rest.
+  // Without the AI: read the whole CV right here in the browser (assets/cv-parser.js). Nothing is sent anywhere.
   async function importBasic(files) {
     setBusy(true);
-    let text = '', images = 0;
-    for (const file of files) {
-      let kind = fileKind(file), blob = file;
-      try {
-        if (kind === 'pages') { const p = await pagesPreview(file); if (p && p.kind === 'pdf') { kind = 'pdf'; blob = p.blob; } else kind = 'image'; }
-        if (kind === 'image') { images++; continue; }
-        text += '\n' + (kind === 'pdf' ? await pdfText(blob) : await textOf(file, kind));
-      } catch (e) { /* skip what can't be opened */ }
-    }
+    let lines = [], images = 0, pages = 0;
+    try {
+      await loadScript('assets/cv-parser.js');
+      const P = window.InklineParser;
+      for (const file of files) {
+        let kind = fileKind(file), blob = file;
+        try {
+          if (kind === 'pages') {
+            const p = await pagesPreview(file);
+            if (!p || p.kind !== 'pdf') { pages++; continue; }
+            kind = 'pdf'; blob = p.blob;
+          }
+          if (kind === 'image') { images++; continue; }
+          if (kind === 'docx' || kind === 'odt') await loadScript('assets/vendor/jszip.min.js');
+          const got = kind === 'pdf' ? await P.linesFromPdf(blob, await loadPdfjs())
+            : kind === 'docx' ? await P.linesFromDocx(file)
+            : kind === 'odt' ? await P.linesFromOdt(file)
+            : kind === 'html' ? P.linesFromHtml(await file.text())
+            : P.linesFromText(await textOf(file, kind));
+          lines = lines.concat(got);
+        } catch (e) { /* skip what can't be opened */ }
+      }
+    } catch (e) { /* the reader itself failed to load */ }
     setBusy(false);
-    if (images && !text.trim()) {
-      bubble('ai', "Reading photos and scans needs the AI, which isn't switched on yet. Once it is, I can read any photo of a CV. For now, I'll ask you a few questions instead.");
-      state.guided = { step: firstMissingStep(), expIndex: state.cv.experience.length - 1, eduIndex: state.cv.education.length - 1 };
-      askGuided();
-      return;
+
+    const read = lines.length ? window.InklineParser.parse(lines).cv : null;
+    const c = state.cv;
+    if (read) {
+      // Keep anything the file didn't have (the visitor already agreed to replace the rest)
+      Object.keys(read).forEach(k => {
+        const v = read[k];
+        if (Array.isArray(v) ? v.length : String(v || '').trim()) c[k] = v;
+      });
+      state.cv = normalize(c);
+      renderCV(true); save();
     }
-    const c = state.cv, found = [];
-    if (text.trim()) {
-      const email = (text.match(/[\w.+-]+@[\w-]+\.[\w.-]+/) || [])[0];
-      const phone = (text.match(/\+?\d[\d\s().-]{7,}\d/) || [])[0];
-      const link = (text.match(/(?:https?:\/\/)?(?:www\.)?(?:linkedin\.com\/in\/[\w-]+|[\w-]+\.(?:com|net|org|io|me|dev)\/[\w\/-]*)/i) || [])[0];
-      const lines = text.split(/\n+/).map(l => l.trim()).filter(Boolean);
-      const nameLine = lines.find(l => /^[A-Za-zÀ-ÿ'’.-]+(\s+[A-Za-zÀ-ÿ'’.-]+){1,3}$/.test(l) && !/curriculum|resume|résumé|\bcv\b|profile|summary/i.test(l));
-      if (email && !c.email) { c.email = email; found.push('email'); }
-      if (phone && !c.phone) { c.phone = phone.trim(); found.push('phone number'); }
-      if (link && !c.link) { c.link = link.replace(/^https?:\/\/(www\.)?/i, ''); found.push('link'); }
-      if (nameLine && !c.name) { c.name = titleCase(nameLine.toLowerCase()); found.push('name'); }
+    const cv = state.cv, n = (k, one) => `${k} ${one}${k === 1 ? '' : 's'}`;
+    const found = [];
+    if (read) {
+      if (read.name) found.push('your name');
+      if (read.email || read.phone || read.location || read.link) found.push('your contact details');
+      if (read.summary) found.push('your profile');
+      if (read.experience.length) found.push(n(read.experience.length, 'job'));
+      if (read.education.length) found.push(n(read.education.length, 'qualification'));
+      if (read.skills.length) found.push(n(read.skills.length, 'skill'));
+      if (read.languages.length) found.push(n(read.languages.length, 'language'));
+      read.extras.forEach(x => found.push('your ' + x.heading.toLowerCase()));
     }
-    renderCV(true); save();
-    bubble('ai', found.length
-      ? `I picked up your ${found.join(', ').replace(/, ([^,]*)$/, ' and $1')} from your old CV. Without the AI switched on I can't read the rest reliably, so I'll ask you about the other parts.`
-      : "I couldn't read much from that file. It may be a scanned picture, which needs the AI. Let's go through it together instead.");
-    state.guided = { step: firstMissingStep(), expIndex: c.experience.length - 1, eduIndex: c.education.length - 1 };
+    const list = found.join(', ').replace(/, ([^,]*)$/, ' and $1');
+    if (found.length >= 2) {
+      bubble('ai', `I read your old CV right here on your device, so it wasn't sent anywhere. I found ${list}. Please check your new CV and click any text to fix it.`);
+      state.guided = { step: 'whatsNew', expIndex: -1, eduIndex: -1, gaps: true, done: [] };
+    } else {
+      bubble('ai', pages && !lines.length
+        ? "That Pages file doesn't include a copy I can read. In Pages, choose File, then Export To, then PDF, and upload the PDF. Or let's go through it together now."
+        : images && !lines.length
+          ? "I can't read photos or scans of a CV. If you have the original file, upload it as a PDF or Word document. Or let's go through it together now."
+          : found.length
+            ? `I could only find ${list} in that file. It may be a scanned copy. If you have the original Word or PDF file, try that. Or let's fill in the rest together.`
+            : "I couldn't find any text in that file. It may be a scanned copy. If you have the original Word or PDF file, try that. Or let's go through it together now.");
+      state.guided = { step: firstMissingStep(), expIndex: cv.experience.length - 1, eduIndex: cv.education.length - 1, gaps: true, done: [] };
+    }
     askGuided();
   }
 
@@ -1337,7 +1404,7 @@
     if (state.mode === 'guided') {
       bubble('ai', greeting);
       if (begun) {
-        state.guided = { step: firstMissingStep(), expIndex: c.experience.length - 1, eduIndex: c.education.length - 1 };
+        state.guided = { step: firstMissingStep(), expIndex: c.experience.length - 1, eduIndex: c.education.length - 1, gaps: true, done: [] };
         askGuided();
       } else {
         state.guided = { step: 'name', expIndex: -1, eduIndex: -1 };
