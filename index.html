@@ -131,8 +131,26 @@ main:focus,section[tabindex="-1"]:focus{outline:none}
 .static-copy{display:none}
 @media (max-height:560px){.cue,.ring{display:none}}
 
-/* static hero: phones, portrait tablets, touch portrait, landscape phones, reduced motion */
-@media (max-width: 720px), (orientation: portrait) and (max-width: 1024px), (orientation: portrait) and (pointer: coarse), (orientation: landscape) and (pointer: coarse) and (max-height: 560px), (prefers-reduced-motion: reduce){
+/* phones and portrait tablets: the ink runs down the middle, so the words sit on a frosted card at the top */
+@media (max-width: 720px), (orientation: portrait) and (max-width: 1024px){
+  .band-l,.band-r,.band-c{left:var(--gutter);right:var(--gutter);top:calc(env(safe-area-inset-top) + 84px);translate:none;width:auto;text-align:left;padding:18px 20px 20px;border-radius:20px;background:rgba(240,245,250,.74);-webkit-backdrop-filter:blur(10px) saturate(1.2);backdrop-filter:blur(10px) saturate(1.2);box-shadow:0 18px 40px -24px rgba(16,18,63,.45)}
+  .band::before{display:none}
+  .band{text-shadow:none}
+  .bh,.band-c .bh{font-size:clamp(32px,9.4vw,48px)}
+  .bs{margin-top:10px;font-size:16px;max-width:none}
+  .band-c .bs{margin-left:0;margin-right:0}
+  .bk{margin-bottom:10px}
+  .cta-row{justify-content:flex-start;margin-top:18px}
+  .cue{bottom:calc(env(safe-area-inset-bottom) + 18px)}
+}
+@media (orientation: landscape) and (max-height: 500px){
+  .bh,.band-c .bh{font-size:clamp(28px,4.2vw,40px)}
+  .bs{font-size:15px;margin-top:10px}
+  .band-c{top:72px}
+}
+
+/* reduced motion: a composed still opening instead of the scroll animation */
+@media (prefers-reduced-motion: reduce){
   .hero{height:auto}
   .stage{position:relative;height:auto;min-height:100svh;display:flex;align-items:flex-end;background:#D3E5F5 url("assets/hero-still.jpg") center 30%/cover no-repeat}
   .stage canvas,.poster,.band,.ring,.cue,.deep{display:none}
@@ -616,7 +634,11 @@ body.paused *,body.paused *::before,body.paused *::after{animation-play-state:pa
   // The footage plays as a sequence of still frames drawn to a canvas. Unlike seeking a video,
   // this runs the same in every browser, forwards and backwards, including Safari.
   const FRAME_COUNT = 96;
-  const frameSrc = i => `assets/frames/f${String(i + 1).padStart(3, '0')}.jpg`;
+  // Upright phones and narrow windows get a tall crop of the footage (smaller, and framed for portrait).
+  const FRAME_SETS = { wide: 'assets/frames/', tall: 'assets/frames-m/' };
+  const TALL = matchMedia('(max-aspect-ratio: 4/5)');
+  let frameSet = TALL.matches ? 'tall' : 'wide', frameGen = 0;
+  const frameSrc = i => `${FRAME_SETS[frameSet]}f${String(i + 1).padStart(3, '0')}.jpg`;
   const ctx = canvas.getContext('2d');
   const bands = [...document.querySelectorAll('.band')].map((el, i, all) => ({
     el, a: parseFloat(el.dataset.a), b: parseFloat(el.dataset.b),
@@ -689,6 +711,16 @@ body.paused *,body.paused *::before,body.paused *::after{animation-play-state:pa
   }
   let sizeT = null;
   addEventListener('resize', () => { clearTimeout(sizeT); sizeT = setTimeout(() => { if (scrubOn) sizeCanvas(); }, 100); });
+  // Turning a phone or tablet swaps to the frame set that fits the new shape.
+  TALL.addEventListener('change', () => {
+    const want = TALL.matches ? 'tall' : 'wide';
+    if (want === frameSet || !heroInit) { frameSet = want; return; }
+    frameSet = want;
+    frames.fill(undefined);
+    loadedCount = 0; lastDrawn = -1;
+    stage.classList.remove('loaded');
+    loadFrames();
+  });
 
   // eased display time, a loop that rests when it arrives
   let target = 0, shown = 0, rafId = null, lastTick = 0, heroOnScreen = true;
@@ -725,15 +757,16 @@ body.paused *,body.paused *::before,body.paused *::after{animation-play-state:pa
     return order;
   }
   async function loadFrames() {
-    const order = loadOrder();
+    const order = loadOrder(), gen = ++frameGen;
     let next = 0, lastRing = 0;
     const worker = async () => {
-      while (next < order.length) {
+      while (next < order.length && gen === frameGen) {
         const i = order[next++];
         const img = new Image();
         img.decoding = 'async';
         img.src = frameSrc(i);
         try { await img.decode(); } catch (e) { continue; }
+        if (gen !== frameGen) return;   // the screen was turned and a new set is loading
         frames[i] = img;
         loadedCount++;
         if (!stage.classList.contains('ready')) { stage.classList.add('ready'); sizeCanvas(); }
@@ -747,6 +780,7 @@ body.paused *,body.paused *::before,body.paused *::after{animation-play-state:pa
       }
     };
     await Promise.all([0, 1, 2, 3, 4, 5].map(worker));
+    if (gen !== frameGen) return;
     if (!loadedCount) failFrames();
     else stage.classList.add('loaded');
   }
@@ -755,12 +789,9 @@ body.paused *,body.paused *::before,body.paused *::after{animation-play-state:pa
     ring.style.display = 'none';
   }
 
-  // the five static-hero gates, kept live
+  // The still opening is only for visitors who ask their device for reduced motion. Phones get the
+  // animation too: the frames are small, and the ink's journey runs down the middle, so it reads upright.
   const GATES = [
-    '(max-width: 720px)',
-    '(orientation: portrait) and (max-width: 1024px)',
-    '(orientation: portrait) and (pointer: coarse)',
-    '(orientation: landscape) and (pointer: coarse) and (max-height: 560px)',
     '(prefers-reduced-motion: reduce)'
   ];
   let scrubOn = false;
