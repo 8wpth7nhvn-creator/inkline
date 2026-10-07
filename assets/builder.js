@@ -166,9 +166,9 @@
       ctx.imageSmoothingQuality = 'high';
       ctx.drawImage(img, sx, sy, s, s, 0, 0, size, size);
       URL.revokeObjectURL(url);
-      const url = c.toDataURL('image/jpeg', 0.86);
-      if (!safePhoto(url)) { toast("That photo couldn't be used. Try another one."); return; }
-      state.photo = url;
+      const photo = c.toDataURL('image/jpeg', 0.86);
+      if (!safePhoto(photo)) { toast("That photo couldn't be used. Try another one."); return; }
+      state.photo = photo;
       save();
       renderCV(true);
       syncPhotoUI();
