@@ -446,7 +446,7 @@
     formEl.innerHTML = `
       <div class="card">
         <h2>Start from your old CV</h2>
-        <p class="sub">${state.mode === 'guided' ? 'Upload a PDF or Word file. It is read right here in your browser, never sent anywhere, and fills in your new CV.' : 'Upload a PDF, Word file or a photo of it. The AI reads it and fills in your new CV, then asks what has changed.'}</p>
+        <p class="sub">${state.mode === 'guided' ? 'Upload a Word file, a PDF or a photo of it. It is read right here in your browser, never sent anywhere, and fills in your new CV.' : 'Upload a PDF, Word file or a photo of it. The AI reads it and fills in your new CV, then asks what has changed.'}</p>
         <button type="button" class="ghost" data-act="import-cv">Upload my old CV</button>
       </div>
 
@@ -1061,6 +1061,30 @@
     if (type.startsWith('text/') || /\.(txt|md|csv|json|xml)$/.test(name)) return 'text';
     return null;
   }
+  // A file with an unusual name or no type: its first bytes say what it really is.
+  const KINDS = new WeakMap();
+  const kindOf = f => KINDS.get(f) || fileKind(f);
+  async function sniffKind(file) {
+    const head = new Uint8Array(await file.slice(0, 16).arrayBuffer());
+    const sig = String.fromCharCode(...head);
+    if (sig.startsWith('%PDF')) return 'pdf';
+    if (sig.startsWith('{\\rtf')) return 'rtf';
+    if ((head[0] === 0xFF && head[1] === 0xD8) || sig.startsWith('\x89PNG') || sig.startsWith('GIF8') || (sig.startsWith('RIFF') && sig.slice(8, 12) === 'WEBP')) return 'image';
+    if (sig.slice(4, 8) === 'ftyp' && /heic|heix|hevc|mif1|avif/.test(sig.slice(8, 12))) return 'image';
+    if (head[0] === 0xD0 && head[1] === 0xCF) return 'doc';
+    if (sig.startsWith('PK')) {
+      await loadScript('assets/vendor/jszip.min.js');
+      const zip = await window.JSZip.loadAsync(await file.arrayBuffer());
+      if (zip.file('word/document.xml')) return 'docx';
+      if (zip.file('content.xml')) return 'odt';
+      if (Object.keys(zip.files).some(n => /preview|Index\/Document\.iwa/i.test(n))) return 'pages';
+      return null;
+    }
+    const sample = await file.slice(0, 4000).text();
+    if (!sample.trim() || (sample.match(/[\x00-\x08\x0e-\x1f\ufffd]/g) || []).length > sample.length * 0.02) return null;
+    return /<(html|body|p|div)[\s>]/i.test(sample) ? 'html' : 'text';
+  }
+
   // Text from the many document formats people keep CVs in.
   async function odtText(file) {
     await loadScript('assets/vendor/jszip.min.js');
@@ -1208,9 +1232,10 @@
       if (!confirm('Replace your current CV with the details from this file?')) return;
     }
     bubble('me', 'Uploaded my old CV: ' + files.map(f => f.name).join(', '));
-    const unknown = files.find(f => !fileKind(f));
+    for (const f of files) if (!fileKind(f)) { const k = await sniffKind(f).catch(() => null); if (k) KINDS.set(f, k); }
+    const unknown = files.find(f => !kindOf(f));
     if (unknown) {
-      bubble('ai', `I can't open "${unknown.name}". PDF, Word, OpenDocument, RTF and text files all work${state.mode === 'ai' ? ', and so do Pages files and photos of a CV' : ''}. If it's another kind, try saving it as a PDF.`);
+      bubble('ai', `I can't read "${unknown.name}". Word, PDF, Pages, OpenDocument, RTF and text files all work, and so do photos and screenshots of a CV. If it's another kind, try saving it as a PDF.`);
       return;
     }
     if (state.mode === 'ai') await importWithAI(files);
@@ -1223,7 +1248,7 @@
     let firstPageOnly = false;
     try {
       for (const file of files) {
-        let kind = fileKind(file), blob = file;
+        let kind = kindOf(file), blob = file;
         if (kind === 'pages') {
           const p = await pagesPreview(file);
           if (!p) throw new Error('pages');
@@ -1269,35 +1294,153 @@
     save();
   }
 
+  // ---------- reading photos and scans (OCR), right here in the browser ----------
+  // The text recognition engine (Tesseract, open source) is served from this site and runs on the
+  // visitor's own device, so the picture is never uploaded anywhere and nothing costs money.
+  async function ocrWorker(onProgress) {
+    await loadScript('assets/vendor/tesseract/tesseract.min.js');
+    const base = new URL('assets/vendor/tesseract/', location.href).href;
+    return window.Tesseract.createWorker('eng', 1, {
+      workerPath: base + 'worker.min.js', corePath: base + 'core', langPath: base + 'lang', workerBlobURL: false,
+      logger: m => { if (m.status === 'recognizing text' && onProgress) onProgress(m.progress); }
+    });
+  }
+  // A photo drawn at a size the text reader likes: small screenshots are enlarged, huge photos shrunk.
+  function imageCanvas(blob) {
+    return new Promise((res, rej) => {
+      const url = URL.createObjectURL(blob), img = new Image();
+      img.onload = () => {
+        const long = Math.max(img.naturalWidth, img.naturalHeight);
+        const k = long > 2600 ? 2600 / long : long < 1600 ? 1600 / long : 1;
+        const c = document.createElement('canvas');
+        c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+        ctx.drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        res(c);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('image')); };
+      img.src = url;
+    });
+  }
+  // The pages of a scanned PDF (one with pictures of text instead of text) as pictures.
+  async function pdfCanvases(blob, max) {
+    const doc = await (await loadPdfjs()).getDocument({ data: await blob.arrayBuffer(), isEvalSupported: false }).promise;
+    const out = [];
+    for (let n = 1; n <= Math.min(doc.numPages, max); n++) {
+      const page = await doc.getPage(n);
+      const vp = page.getViewport({ scale: 2200 / page.getViewport({ scale: 1 }).width });
+      const c = document.createElement('canvas');
+      c.width = Math.round(vp.width); c.height = Math.round(vp.height);
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+      await page.render({ canvasContext: ctx, viewport: vp }).promise;
+      out.push(c);
+    }
+    return out;
+  }
+  // Grey, with light-on-dark text (like a coloured sidebar) turned into dark-on-light, which reads far better.
+  // The picture is measured in small squares: a square that is dark, in a dark neighbourhood, is flipped.
+  function cleanForOcr(c) {
+    const w = c.width, h = c.height, ctx = c.getContext('2d');
+    const img = ctx.getImageData(0, 0, w, h), d = img.data;
+    const B = 24, bw = Math.ceil(w / B), bh = Math.ceil(h / B);
+    const sum = new Float64Array(bw * bh), count = new Uint32Array(bw * bh), lum = new Uint8ClampedArray(w * h);
+    for (let y = 0, i = 0, p = 0; y < h; y++) {
+      const row = Math.floor(y / B) * bw;
+      for (let x = 0; x < w; x++, i += 4, p++) {
+        const v = d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114, k = row + Math.floor(x / B);
+        lum[p] = v; sum[k] += v; count[k]++;
+      }
+    }
+    const mean = k => sum[k] / count[k], flip = new Uint8Array(bw * bh);
+    for (let by = 0; by < bh; by++) for (let bx = 0; bx < bw; bx++) {
+      let s = 0, n = 0;
+      for (let yy = Math.max(0, by - 1); yy <= Math.min(bh - 1, by + 1); yy++)
+        for (let xx = Math.max(0, bx - 1); xx <= Math.min(bw - 1, bx + 1); xx++) { s += mean(yy * bw + xx); n++; }
+      flip[by * bw + bx] = s / n < 100 && mean(by * bw + bx) < 128 ? 1 : 0;
+    }
+    for (let y = 0, i = 0, p = 0; y < h; y++) {
+      const row = Math.floor(y / B) * bw;
+      for (let x = 0; x < w; x++, i += 4, p++) d[i] = d[i + 1] = d[i + 2] = flip[row + Math.floor(x / B)] ? 255 - lum[p] : lum[p];
+    }
+    ctx.putImageData(img, 0, 0);
+    return c;
+  }
+  // A photo taken at a slight angle, turned straight (rotating it ourselves keeps big text like the name readable).
+  function straighten(c, radians) {
+    if (Math.abs(radians) < 0.005) return c;
+    const r = document.createElement('canvas');
+    r.width = c.width; r.height = c.height;
+    const ctx = r.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, r.width, r.height);
+    ctx.translate(r.width / 2, r.height / 2); ctx.rotate(radians); ctx.drawImage(c, -c.width / 2, -c.height / 2);
+    return r;
+  }
+  async function readPictures(canvases) {
+    const note = bubble('ai', 'Reading the text in your picture. This can take up to a minute…', false);
+    const show = (i, p) => { note.textContent = `Reading the text in your picture${canvases.length > 1 ? ` (${i + 1} of ${canvases.length})` : ''}… ${Math.round(p * 100)}%`; };
+    let worker = null;
+    try {
+      let current = 0;
+      worker = await ocrWorker(p => show(current, p));
+      const pages = [];
+      for (; current < canvases.length; current++) {
+        const clean = cleanForOcr(canvases[current]);
+        // a quick first look only measures the angle; the real read happens on the straightened picture
+        const angle = (await worker.recognize(clean, { rotateAuto: true }, { text: false })).data.rotateRadians || 0;
+        const page = straighten(clean, angle);
+        const { data } = await worker.recognize(page, {}, { blocks: true });
+        pages.push({ blocks: data.blocks || [], width: page.width, height: page.height });
+      }
+      return window.InklineParser.linesFromOcr(pages);
+    } finally {
+      if (worker) worker.terminate();
+      if (note.label) note.label.remove();
+      note.remove();
+    }
+  }
+  const textLength = lines => lines.reduce((n, l) => n + l.text.length, 0);
+
   // Without the AI: read the whole CV right here in the browser (assets/cv-parser.js). Nothing is sent anywhere.
   async function importBasic(files) {
     setBusy(true);
-    let lines = [], images = 0, pages = 0;
+    let lines = [], pictures = [], pages = 0, unreadable = 0, ocrFailed = false, firstPageOnly = false;
     try {
       await loadScript('assets/cv-parser.js');
       const P = window.InklineParser;
       for (const file of files) {
-        let kind = fileKind(file), blob = file;
+        let kind = kindOf(file), blob = file;
         try {
           if (kind === 'pages') {
             const p = await pagesPreview(file);
-            if (!p || p.kind !== 'pdf') { pages++; continue; }
-            kind = 'pdf'; blob = p.blob;
+            if (!p) { pages++; continue; }
+            kind = p.kind; blob = p.blob; firstPageOnly = firstPageOnly || !!p.firstPageOnly;
           }
-          if (kind === 'image') { images++; continue; }
+          if (kind === 'image') {
+            try { pictures.push(await imageCanvas(blob)); } catch (e) { unreadable++; }
+            continue;
+          }
           if (kind === 'docx' || kind === 'odt') await loadScript('assets/vendor/jszip.min.js');
           const got = kind === 'pdf' ? await P.linesFromPdf(blob, await loadPdfjs())
             : kind === 'docx' ? await P.linesFromDocx(file)
             : kind === 'odt' ? await P.linesFromOdt(file)
             : kind === 'html' ? P.linesFromHtml(await file.text())
             : P.linesFromText(await textOf(file, kind));
-          lines = lines.concat(got);
+          // a PDF with almost no text is a scan: read its pages as pictures
+          if (kind === 'pdf' && textLength(got) < 80) pictures.push(...await pdfCanvases(blob, 3));
+          else lines = lines.concat(got);
         } catch (e) { /* skip what can't be opened */ }
+      }
+      if (pictures.length) {
+        try { lines = lines.concat(await readPictures(pictures.slice(0, 4))); } catch (e) { ocrFailed = true; }
       }
     } catch (e) { /* the reader itself failed to load */ }
     setBusy(false);
 
-    const read = lines.length ? window.InklineParser.parse(lines).cv : null;
+    let read = null;
+    try { read = lines.length ? window.InklineParser.parse(lines).cv : null; } catch (e) { read = null; }
     const c = state.cv;
     if (read) {
       // Keep anything the file didn't have (the visitor already agreed to replace the rest)
@@ -1321,17 +1464,24 @@
       read.extras.forEach(x => found.push('your ' + x.heading.toLowerCase()));
     }
     const list = found.join(', ').replace(/, ([^,]*)$/, ' and $1');
+    const fromPicture = pictures.length > 0 && !ocrFailed;
     if (found.length >= 2) {
-      bubble('ai', `I read your old CV right here on your device, so it wasn't sent anywhere. I found ${list}. Please check your new CV and click any text to fix it.`);
+      bubble('ai', `I read your old CV right here on your device, so it wasn't sent anywhere. I found ${list}. ` +
+        (fromPicture ? 'Reading text from a picture is never perfect, so please check your new CV carefully and click any text to fix it.' : 'Please check your new CV and click any text to fix it.'));
+      if (firstPageOnly) bubble('ai', 'Note: that Pages file only let me see its first page. If your CV is longer, export it from Pages as a PDF and upload that too.');
       state.guided = { step: 'whatsNew', expIndex: -1, eduIndex: -1, gaps: true, done: [] };
     } else {
-      bubble('ai', pages && !lines.length
-        ? "That Pages file doesn't include a copy I can read. In Pages, choose File, then Export To, then PDF, and upload the PDF. Or let's go through it together now."
-        : images && !lines.length
-          ? "I can't read photos or scans of a CV. If you have the original file, upload it as a PDF or Word document. Or let's go through it together now."
-          : found.length
-            ? `I could only find ${list} in that file. It may be a scanned copy. If you have the original Word or PDF file, try that. Or let's fill in the rest together.`
-            : "I couldn't find any text in that file. It may be a scanned copy. If you have the original Word or PDF file, try that. Or let's go through it together now.");
+      bubble('ai', ocrFailed
+        ? "I couldn't start the picture reader in this browser. Try another browser, or upload your CV as a Word or PDF file. Or let's go through it together now."
+        : unreadable && !lines.length && !pictures.length
+          ? "This browser can't open that kind of photo (often an iPhone HEIC photo). Take a screenshot of it, or save it as a JPG, and upload that. Or let's go through it together now."
+          : pages && !lines.length
+            ? "That Pages file doesn't include a copy I can read. In Pages, choose File, then Export To, then PDF, and upload the PDF. Or let's go through it together now."
+            : fromPicture
+              ? `I couldn't read enough from that picture${found.length ? ` (only ${list})` : ''}. A sharp, straight photo in good light works best, or a screenshot of the CV. Or let's fill it in together now.`
+              : found.length
+                ? `I could only find ${list} in that file. If you have the original Word or PDF file, try that. Or let's fill in the rest together.`
+                : "I couldn't find any text in that file. If you have the original Word or PDF file, try that. Or let's go through it together now.");
       state.guided = { step: firstMissingStep(), expIndex: cv.experience.length - 1, eduIndex: cv.education.length - 1, gaps: true, done: [] };
     }
     askGuided();

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'">
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <title>Make your CV · Inkline</title>
 <meta name="description" content="Make your CV with AI, or fill in a beautiful template yourself. Add your photo, pick a design and download your PDF free.">
@@ -382,7 +382,7 @@ textarea.f-in{resize:vertical;min-height:84px}
     </div>
     <button type="button" class="choice-upload" data-choose="upload">
       <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4M7 9l5-5 5 5"/><path d="M5 15v4h14v-4"/></svg></span>
-      <span><b>Have an old CV?</b> Upload it as a PDF or Word file. Inkline fills in a fresh CV from it, then asks what's new.</span>
+      <span><b>Have an old CV?</b> Upload it as a Word file, PDF or even a photo. Inkline fills in a fresh CV from it, then asks what's new.</span>
     </button>
     <p class="foot">Your CV and photo stay saved in this browser. <a href="index.html">Back to the home page</a></p>
   </div>

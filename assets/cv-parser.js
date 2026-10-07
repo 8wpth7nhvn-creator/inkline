@@ -188,74 +188,105 @@
     return gx;
   }
 
-  // PDF: text pieces are grouped into lines by position, columns are read one at a time,
-  // and indents and wrapped lines are noted so bullet points come out whole.
+  // PDF: the text pieces on each page, with their positions.
   async function linesFromPdf(blob, pdfjs) {
     const doc = await pdfjs.getDocument({ data: await blob.arrayBuffer(), isEvalSupported: false }).promise;
     const out = [];
     for (let n = 1; n <= Math.min(doc.numPages, 6); n++) {
       const page = await doc.getPage(n);
-      const width = page.getViewport({ scale: 1 }).width;
       const tc = await page.getTextContent();
-      const items = tc.items.filter(it => it.str && it.str.trim()).map(it => ({
+      linesFromItems(tc.items.filter(it => it.str && it.str.trim()).map(it => ({
         str: it.str, x: it.transform[4], y: it.transform[5], w: it.width, h: Math.abs(it.transform[3]) || it.height || 10,
         bold: /bold|black|heavy|semibold/i.test(((tc.styles[it.fontName] || {}).fontFamily || '') + ' ' + (it.fontName || ''))
-      }));
-      if (!items.length) continue;
-      items.sort((a, b) => b.y - a.y || a.x - b.x);
-      const rows = [];
-      for (const it of items) {
-        const row = rows.find(r => Math.abs(r.y - it.y) <= Math.max(2, it.h * 0.35));
-        if (row) row.items.push(it); else rows.push({ y: it.y, items: [it] });
-      }
-      rows.forEach(r => r.items.sort((a, b) => a.x - b.x));
-      const gx = findGutter(rows, width);
-      const cols = gx === null ? [rows] : [[], []];
-      if (gx !== null) rows.forEach(r => {
-        const crossing = r.items.some(it => it.x < gx && it.x + it.w > gx);
-        if (crossing) { cols[r.items[0].x + r.items[0].w / 2 < gx ? 0 : 1].push(r); return; }
-        const left = r.items.filter(it => it.x + it.w <= gx), right = r.items.filter(it => it.x >= gx);
-        if (left.length) cols[0].push({ y: r.y, items: left });
-        if (right.length) cols[1].push({ y: r.y, items: right });
-      });
-      const sizes = items.map(it => it.h).sort((a, b) => a - b);
-      const body = sizes[Math.floor(sizes.length / 2)] || 10;
-      cols.forEach((col, ci) => {
-        if (!col.length) return;
-        const minX = Math.min(...col.map(r => r.items[0].x));
-        const maxR = Math.max(...col.map(r => { const l = r.items[r.items.length - 1]; return l.x + l.w; }));
-        let prev = null;
-        col.forEach((r, ri) => {
-          let text = '', last = null, gap = 0;
-          for (const it of r.items) {
-            if (last) gap = Math.max(gap, it.x - (last.x + last.w));
-            if (last && it.x - (last.x + last.w) > it.h * 0.2 && !/\s$/.test(text) && !/^\s/.test(it.str)) text += ' ';
-            text += it.str; last = it;
-          }
-          const h = Math.max(...r.items.map(it => it.h)), right = last.x + last.w;
-          // a row that starts with dates in a column of their own (a timeline): its text starts after them
-          let x = r.items[0].x;
-          for (let k = 1; k < r.items.length; k++) {
-            if (r.items[k].x - (r.items[k - 1].x + r.items[k - 1].w) <= h) continue;
-            const d = findDates(r.items.slice(0, k).map(it => it.str).join(' '));
-            if (d && tidyRest(d.rest).length < 3) x = r.items[k].x;
-            break;
-          }
-          const bold = r.items.every(it => it.bold);
-          const info = {
-            size: h, heading: h > body * 1.18, bold, x,
-            // a line that runs to the margin may continue on the next; one with a date pushed to the right doesn't
-            full: right > maxR - (maxR - minX) * 0.15 && gap < h * 1.5,
-            cont: !!prev && prev.full && !/[.!?:;]$/.test(prev.text.trim()) && !BULLET.test(text) && x >= prev.x - 2 && x <= prev.x + 24 &&
-              Math.abs(h - prev.size) < 1.5 && bold === prev.bold && prev.y - r.y < h * 2.2,
-            colStart: ci > 0 && ri === 0
-          };
-          pushLine(out, text, info);
-          prev = Object.assign({ text, y: r.y }, info);
-        });
-      });
+      })), page.getViewport({ scale: 1 }).width, out);
     }
     return out;
+  }
+
+  // A photo or scan, after text recognition (OCR): words with their boxes, scaled to the size of a
+  // PDF page so the same layout rules apply. Bullet marks the OCR misread (often as "e" or "o") are restored.
+  const OCR_BULLET = /^(?:[eo°©®«»*+¢•·◦▪■□>~\-–]|ee|oe|eo)$/;
+  const OCR_BULLET_START = /^(?:[eo°©®«»*+¢•·◦▪■□>~]|ee|oe|eo)\s+(?=[\p{Lu}\d])/u;
+  function linesFromOcr(pages) {
+    const out = [];
+    for (const p of pages) {
+      const k = 595 / p.width, items = [];
+      for (const b of p.blocks || []) for (const para of b.paragraphs || []) for (const line of para.lines || []) {
+        const words = (line.words || []).filter(w => w.text && w.text.trim() && w.confidence >= 10);
+        if (!words.length || words.map(w => w.text).join('').replace(/[^\p{L}\d]/gu, '').length < 2) continue;
+        const lh = (line.bbox.y1 - line.bbox.y0) * k, y = (p.height - line.bbox.y1) * k;
+        words.forEach((w, i) => items.push({
+          str: i === 0 && words.length > 1 && OCR_BULLET.test(w.text) && /^[\p{Lu}\d]/u.test(words[1].text) ? '•' : w.text,
+          x: w.bbox.x0 * k, y, w: (w.bbox.x1 - w.bbox.x0) * k, h: lh * 0.8, bold: false
+        }));
+      }
+      linesFromItems(items, 595, out, true);
+    }
+    return out;
+  }
+
+  // Positioned text pieces become lines: grouped into rows, columns read one at a time, and indents
+  // and wrapped lines noted so bullet points come out whole. y runs up from the bottom of the page.
+  function linesFromItems(items, width, out, ocr) {
+    if (!items.length) return;
+    items.sort((a, b) => b.y - a.y || a.x - b.x);
+    const rows = [];
+    for (const it of items) {
+      const row = rows.find(r => Math.abs(r.y - it.y) <= Math.max(2, it.h * 0.35));
+      if (row) row.items.push(it); else rows.push({ y: it.y, items: [it] });
+    }
+    rows.forEach(r => r.items.sort((a, b) => a.x - b.x));
+    const gx = findGutter(rows, width);
+    const cols = gx === null ? [rows] : [[], []];
+    if (gx !== null) rows.forEach(r => {
+      const crossing = r.items.some(it => it.x < gx && it.x + it.w > gx);
+      if (crossing) { cols[r.items[0].x + r.items[0].w / 2 < gx ? 0 : 1].push(r); return; }
+      const left = r.items.filter(it => it.x + it.w <= gx), right = r.items.filter(it => it.x >= gx);
+      if (left.length) cols[0].push({ y: r.y, items: left });
+      if (right.length) cols[1].push({ y: r.y, items: right });
+    });
+    const sizes = items.map(it => it.h).sort((a, b) => a - b);
+    const body = sizes[Math.floor(sizes.length / 2)] || 10;
+    cols.forEach((col, ci) => {
+      if (!col.length) return;
+      const minX = Math.min(...col.map(r => r.items[0].x));
+      const maxR = Math.max(...col.map(r => { const l = r.items[r.items.length - 1]; return l.x + l.w; }));
+      let prev = null;
+      col.forEach((r, ri) => {
+        let text = '', last = null, gap = 0;
+        for (const it of r.items) {
+          if (last) gap = Math.max(gap, it.x - (last.x + last.w));
+          // OCR words are always separate words; PDF pieces can be parts of one word
+          if (last && (ocr || it.x - (last.x + last.w) > it.h * 0.2) && !/\s$/.test(text) && !/^\s/.test(it.str)) text += ' ';
+          text += it.str; last = it;
+        }
+        const h = Math.max(...r.items.map(it => it.h)), right = last.x + last.w;
+        // a row that starts with dates in a column of their own (a timeline): its text starts after them
+        let x = r.items[0].x;
+        for (let k = 1; k < r.items.length; k++) {
+          if (r.items[k].x - (r.items[k - 1].x + r.items[k - 1].w) <= h) continue;
+          const d = findDates(r.items.slice(0, k).map(it => it.str).join(' '));
+          if (d && tidyRest(d.rest).length < 3) x = r.items[k].x;
+          break;
+        }
+        const bold = r.items.every(it => it.bold);
+        const info = {
+          size: h, heading: h > body * 1.18, bold, x,
+          // a line that runs to the margin may continue on the next; one with a date pushed to the right doesn't
+          full: right > maxR - (maxR - minX) * 0.15 && gap < h * 1.5,
+          cont: !!prev && prev.full && !/[.!?:;]$/.test(prev.text.trim()) && !BULLET.test(text) && x >= prev.x - (ocr ? 4 : 2) && x <= prev.x + 24 &&
+            Math.abs(h - prev.size) < Math.max(1.5, ocr ? h * 0.3 : 0) && bold === prev.bold && prev.y - r.y < h * (ocr ? 2.6 : 2.2),
+          colStart: ci > 0 && ri === 0
+        };
+        // stray marks from photos: a bar at the start of a line, or a misread bullet once columns are split
+        if (ocr) {
+          text = text.replace(/^[|¦]\s+/, '').replace(OCR_BULLET_START, '• ');
+          if (text.replace(/[^\p{L}\d]/gu, '').length < 2) return;
+        }
+        pushLine(out, text, info);
+        prev = Object.assign({ text, y: r.y }, info);
+      });
+    });
   }
 
   function linesFromHtml(raw) {
@@ -501,5 +532,5 @@
     return st;
   }
 
-  global.InklineParser = { linesFromDocx, linesFromOdt, linesFromPdf, linesFromHtml, linesFromText, parse };
+  global.InklineParser = { linesFromDocx, linesFromOdt, linesFromPdf, linesFromOcr, linesFromHtml, linesFromText, parse };
 })(window);
