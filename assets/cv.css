@@ -251,6 +251,142 @@
 .cv.custom-font,.cv.custom-font *{font-family:var(--cv-body-font)}
 .cv.custom-font .cv-name,.cv.custom-font .cv-section>h2,.cv.custom-font .cv-role,.cv.custom-font .cv-mono{font-family:var(--cv-head-font)}
 
+/* ===================== more classic designs ===================== */
+
+/* Summit: headings sit in the left margin; big name, contact stacked on the right */
+.tpl-summit .cv-head{padding-bottom:16pt;margin-bottom:6pt;border-bottom:1.5pt solid var(--cv-ink)}
+.tpl-summit .cv-head-text{display:grid;grid-template-columns:1fr auto;column-gap:20pt;align-items:end}
+.tpl-summit .cv-name{grid-column:1;font-size:calc(30pt * var(--cv-name-scale,1));font-weight:700;letter-spacing:-.02em}
+.tpl-summit .cv-title{grid-column:1;color:var(--cv-accent);font-weight:600}
+.tpl-summit .cv-head-text>.cv-contact{grid-column:2;grid-row:1 / span 2;flex-direction:column;align-items:flex-end;gap:2pt;margin:0;text-align:end}
+.tpl-summit .cv-head-text>.cv-contact span::after{content:none!important}
+.tpl-summit .cv-section{display:grid;grid-template-columns:96pt 1fr;column-gap:18pt;grid-auto-flow:row dense;margin-top:16pt}
+.tpl-summit .cv-section>h2{grid-column:1;grid-row:1;text-align:end;margin:1pt 0 0;color:var(--cv-accent);font-size:calc(8.4pt * var(--cv-head-scale,1));letter-spacing:.1em;line-height:1.3}
+.tpl-summit .cv-section>:not(h2){grid-column:2}
+
+/* Mono: typewriter type, bracketed headings, dashed rules */
+.tpl-mono{font-family:'Spline Sans Mono',monospace;font-size:calc(8.8pt * var(--cv-text-scale,1));line-height:1.5;padding:44pt 50pt}
+.tpl-mono .cv-name{font-family:'Spline Sans Mono',monospace;font-weight:500;font-size:calc(22pt * var(--cv-name-scale,1));letter-spacing:-.02em}
+.tpl-mono .cv-title{color:var(--cv-ink);font-weight:400;margin-top:6pt}
+.tpl-mono .cv-title::before{content:"> ";color:var(--cv-accent)}
+.tpl-mono .cv-head{padding-bottom:12pt;border-bottom:1pt dashed var(--cv-ink)}
+.tpl-mono .cv-section>h2{font-family:'Spline Sans Mono',monospace;color:var(--cv-ink);font-weight:500;letter-spacing:.04em;font-size:calc(8.8pt * var(--cv-head-scale,1))}
+.tpl-mono .cv-section>h2::before{content:"[ ";color:var(--cv-accent)}
+.tpl-mono .cv-section>h2::after{content:" ]";color:var(--cv-accent)}
+.tpl-mono .cv-role{font-weight:500;font-size:calc(9pt * var(--cv-text-scale,1))}
+.tpl-mono .cv-bullets li::before{content:"-";width:auto;height:auto;background:none;color:var(--cv-accent);vertical-align:baseline}
+.tpl-mono .cv-section+.cv-section{padding-top:12pt;border-top:1pt dashed var(--cv-rule)}
+
+/* Marker: a big name with a highlighter stroke, heavy rules over each section */
+.tpl-marker .cv-name{display:inline;font-size:calc(38pt * var(--cv-name-scale,1));font-weight:700;letter-spacing:-.03em;line-height:1.15;background:linear-gradient(transparent 60%,var(--cv-tint-2) 60%,var(--cv-tint-2) 92%,transparent 92%);-webkit-box-decoration-break:clone;box-decoration-break:clone}
+.tpl-marker .cv-title{margin-top:10pt;font-size:calc(12pt * var(--cv-name-scale,1));font-weight:600;color:var(--cv-accent)}
+.tpl-marker .cv-head{margin-bottom:6pt}
+.tpl-marker .cv-section{margin-top:18pt;padding-top:8pt;border-top:2.5pt solid var(--cv-ink)}
+.tpl-marker .cv-section>h2{color:var(--cv-ink);font-size:calc(10pt * var(--cv-head-scale,1));letter-spacing:.06em;font-weight:700}
+.tpl-marker .cv-dates{color:var(--cv-accent);font-weight:600}
+
+/* Swiss: a strong colour bar under the name, numbered sections */
+.tpl-swiss{counter-reset:sec;padding-top:0}
+.tpl-swiss .cv-head{margin:0 -52pt 20pt;padding:40pt 52pt 16pt;border-bottom:9pt solid var(--cv-accent)}
+.tpl-swiss .cv-name{font-size:calc(32pt * var(--cv-name-scale,1));font-weight:700;letter-spacing:-.035em;line-height:1}
+.tpl-swiss .cv-title{color:var(--cv-ink);font-weight:500;font-size:calc(11.5pt * var(--cv-name-scale,1));margin-top:8pt}
+.tpl-swiss .cv-section>h2{counter-increment:sec;display:flex;align-items:baseline;gap:8pt;color:var(--cv-ink);font-size:calc(10pt * var(--cv-head-scale,1));letter-spacing:.02em;text-transform:none;font-weight:700}
+.tpl-swiss .cv-section>h2::before{content:counter(sec,decimal-leading-zero);color:var(--cv-accent);font-size:.9em;font-variant-numeric:tabular-nums}
+.tpl-swiss .cv-entry-top{border-top:.8pt solid var(--cv-rule);padding-top:5pt}
+
+/* ===================== more colourful designs ===================== */
+
+/* Prism: gradient colour sidebar, rounded photo, labels on colour */
+.tpl-prism .cv-grid{grid-template-columns:200pt 1fr;grid-template-areas:"side main"}
+.tpl-prism .cv-side{background:linear-gradient(165deg,var(--cv-accent),color-mix(in srgb,var(--cv-accent) 62%,#000));color:#fff;padding:40pt 24pt 34pt;--cv-soft:rgba(255,255,255,.82)}
+.tpl-prism .cv-main{padding:44pt 40pt 38pt 32pt}
+.tpl-prism .cv-photo{--ph:132pt;border-radius:22pt;margin:0 auto 24pt;outline:3pt solid rgba(255,255,255,.35);outline-offset:4pt;background:rgba(255,255,255,.14)}
+.tpl-prism .cv-mono,.tpl-prism .cv-addphoto{color:#fff}
+.tpl-prism .cv-addphoto{outline:1.5pt dashed rgba(255,255,255,.75);outline-offset:-6pt;background:rgba(255,255,255,.12)}
+.tpl-prism .cv-name{font-size:calc(32pt * var(--cv-name-scale,1));font-weight:700;letter-spacing:-.025em;line-height:1}
+.tpl-prism .cv-title{margin-top:10pt;font-weight:600;letter-spacing:.04em}
+.tpl-prism .cv-head{margin-bottom:18pt}
+.tpl-prism .cv-section>h2{display:inline-block;background:var(--cv-accent);color:#fff;padding:2.5pt 9pt;border-radius:4pt;letter-spacing:.08em;font-size:calc(8.6pt * var(--cv-head-scale,1));margin-bottom:9pt}
+.tpl-prism .cv-side .cv-section{margin-top:20pt}
+.tpl-prism .cv-side .cv-section>h2{background:rgba(255,255,255,.16)}
+.tpl-prism .cv-side .cv-contact-list svg{color:#fff;opacity:.85}
+.tpl-prism .cv-side .cv-tags li::before,.tpl-prism .cv-side .cv-bullets li::before{background:#fff;opacity:.8}
+.tpl-prism .cv-main .cv-entry{padding-bottom:9pt;border-bottom:.8pt dashed var(--cv-rule)}
+.tpl-prism .cv-main .cv-entry:last-child{border-bottom:0;padding-bottom:0}
+
+/* Coast: two-tone slanted header with the photo on the darker side, side column on the right */
+.tpl-coast .cv-top{display:flex;align-items:center;justify-content:space-between;gap:24pt;padding:36pt 46pt 34pt;color:#fff;background:linear-gradient(105deg,var(--cv-accent) 0 64%,color-mix(in srgb,var(--cv-accent) 68%,#000) 64% 100%)}
+.tpl-coast .cv-head{margin:0}
+.tpl-coast .cv-name{font-size:calc(30pt * var(--cv-name-scale,1));font-weight:700;letter-spacing:-.01em;line-height:1.02}
+.tpl-coast .cv-title{color:rgba(255,255,255,.88);text-transform:uppercase;letter-spacing:.14em;font-size:calc(9.4pt * var(--cv-name-scale,1));margin-top:9pt}
+.tpl-coast .cv-photo{--ph:104pt;outline:3pt solid #fff;outline-offset:3pt;margin-inline-end:6pt}
+.tpl-coast .cv-addphoto{background:rgba(255,255,255,.14);color:#fff;outline:1.5pt dashed rgba(255,255,255,.75);outline-offset:-6pt}
+.tpl-coast .cv-mono{background:rgba(255,255,255,.16);color:#fff}
+.tpl-coast .cv-grid{grid-template-columns:1fr 196pt;grid-template-areas:"main side"}
+.tpl-coast .cv-main{padding:26pt 28pt 38pt 46pt}
+.tpl-coast .cv-side{padding:26pt 28pt 38pt 20pt;border-inline-start:.8pt solid var(--cv-rule)}
+.tpl-coast .cv-section>h2{color:var(--cv-accent);font-size:calc(9.4pt * var(--cv-head-scale,1));letter-spacing:.1em;padding-bottom:5pt;border-bottom:2pt dotted var(--cv-tint-2);margin-bottom:9pt}
+.tpl-coast .cv-side .cv-section{margin-top:18pt}
+
+/* Ember: a magazine photo across the top of a tinted sidebar, a strong bar under the name */
+.tpl-ember .cv-grid{grid-template-columns:196pt 1fr;grid-template-areas:"side main"}
+.tpl-ember .cv-side{background:var(--cv-tint);padding:0 22pt 34pt}
+.tpl-ember .cv-side>.cv-photo{width:auto;height:212pt;margin:0 -22pt 22pt;border-radius:0;background:var(--cv-tint-2)}
+.tpl-ember .cv-main{padding:46pt 40pt 38pt 34pt}
+.tpl-ember .cv-name{font-size:calc(34pt * var(--cv-name-scale,1));font-weight:700;letter-spacing:-.03em;line-height:.98}
+.tpl-ember .cv-head::after{content:"";display:block;width:56pt;height:5pt;margin-top:14pt;background:var(--cv-accent)}
+.tpl-ember .cv-title{color:var(--cv-ink);font-weight:600;font-size:calc(11pt * var(--cv-name-scale,1));margin-top:8pt}
+.tpl-ember .cv-section>h2{color:var(--cv-ink);display:flex;align-items:center;gap:7pt;letter-spacing:.09em}
+.tpl-ember .cv-section>h2::before{content:"";flex:none;width:7pt;height:7pt;background:var(--cv-accent)}
+.tpl-ember .cv-role{color:var(--cv-accent)}
+
+/* Linen: warm paper, centred header with the photo above the name */
+.tpl-linen{background:#FAF6EF;font-family:'Newsreader',Georgia,serif;font-size:calc(10pt * var(--cv-text-scale,1))}
+.tpl-linen .cv-top{display:flex;flex-direction:column;align-items:center;text-align:center;margin:0 46pt;padding:36pt 0 18pt;border-bottom:3pt double color-mix(in srgb,var(--cv-accent) 45%,#FAF6EF)}
+.tpl-linen .cv-photo{--ph:92pt;outline:1.2pt solid var(--cv-accent);outline-offset:4pt;margin-bottom:14pt;background:var(--cv-tint)}
+.tpl-linen .cv-head{margin:0}
+.tpl-linen .cv-name{font-weight:400;font-size:calc(30pt * var(--cv-name-scale,1));letter-spacing:.06em;text-transform:uppercase}
+.tpl-linen .cv-title{font-style:italic;color:var(--cv-accent);font-weight:400;font-size:calc(11.5pt * var(--cv-name-scale,1));margin-top:6pt}
+.tpl-linen .cv-top>.cv-contact{justify-content:center;margin-top:10pt;font-family:'Hanken Grotesk',Arial,sans-serif}
+.tpl-linen .cv-grid{grid-template-columns:1fr 170pt;grid-template-areas:"main side"}
+.tpl-linen .cv-main{padding:22pt 26pt 38pt 46pt}
+.tpl-linen .cv-side{padding:22pt 46pt 38pt 0}
+.tpl-linen .cv-section>h2{font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:calc(11pt * var(--cv-head-scale,1));letter-spacing:.14em;color:var(--cv-ink)}
+.tpl-linen .cv-section>h2::after{content:"";display:block;width:22pt;height:1.2pt;margin-top:5pt;background:var(--cv-accent)}
+.tpl-linen .cv-role{font-size:calc(10.6pt * var(--cv-text-scale,1))}
+.tpl-linen .cv-bullets li::before{width:3pt;height:3pt;border-radius:50%;vertical-align:.22em}
+
+/* Petal: a softly tinted page with each section on a white card */
+.tpl-petal{background:color-mix(in srgb,var(--cv-accent) 7%,#fff)}
+.tpl-petal .cv-top{display:grid;grid-template-columns:auto 1fr;column-gap:20pt;align-items:center;padding:34pt 40pt 18pt}
+.tpl-petal .cv-top>.cv-photo{grid-row:1 / span 2;--ph:86pt;outline:4pt solid #fff;outline-offset:0;box-shadow:0 4pt 14pt rgba(21,23,46,.12)}
+.tpl-petal .cv-head{margin:0;align-self:end}
+.tpl-petal .cv-top>.cv-contact{grid-column:2;align-self:start;margin-top:8pt}
+.tpl-petal .cv-name{font-size:calc(28pt * var(--cv-name-scale,1));font-weight:700;color:var(--cv-accent);letter-spacing:-.015em}
+.tpl-petal .cv-title{color:var(--cv-ink);font-weight:500}
+.tpl-petal .cv-grid{grid-template-columns:1fr 168pt;grid-template-areas:"main side";column-gap:14pt;padding:0 40pt 36pt}
+.tpl-petal.two .cv-main>.cv-section,.tpl-petal.two .cv-side>.cv-section{background:#fff;border-radius:12pt;padding:14pt 16pt;margin-top:12pt;box-shadow:0 1pt 3pt rgba(21,23,46,.06)}
+.tpl-petal.two .cv-main>.cv-section:first-child,.tpl-petal.two .cv-side>.cv-section:first-child{margin-top:4pt}
+.tpl-petal .cv-section>h2{color:var(--cv-accent);letter-spacing:.09em;font-size:calc(8.8pt * var(--cv-head-scale,1))}
+
+/* ===================== icons and text placed anywhere on the page ===================== */
+.cv{position:relative}
+.cv-badges{position:absolute;inset:0;pointer-events:none;z-index:2}
+.cv-badge{position:absolute;display:inline-flex;align-items:center;gap:5pt;pointer-events:auto;color:var(--cv-ink);font-size:calc(8.8pt * var(--cv-text-scale,1));line-height:1.25;white-space:nowrap}
+.cv-badge-ic svg{display:block;width:12pt;height:12pt}
+.cv-badge.size-s{font-size:calc(7.8pt * var(--cv-text-scale,1))}
+.cv-badge.size-s .cv-badge-ic svg{width:10pt;height:10pt}
+.cv-badge.size-l{font-size:calc(10.6pt * var(--cv-text-scale,1))}
+.cv-badge.size-l .cv-badge-ic svg{width:16pt;height:16pt}
+.cv-badge.tone-light{color:#fff}
+.cv-badge.tone-accent .cv-badge-ic{color:var(--cv-accent)}
+.cv.editable .cv-badge-ic,.cv.editable .cv-badge-grip{cursor:grab;touch-action:none;border-radius:3pt;padding:1.5pt;margin:-1.5pt;outline:none}
+.cv.editable .cv-badge-grip{display:inline-block;width:10pt;height:13pt;background:radial-gradient(circle,currentColor 1pt,transparent 1.4pt) 0 0/5pt 4.4pt;opacity:.55}
+.cv.editable .cv-badge:hover,.cv.editable .cv-badge:focus-within{outline:1pt dashed color-mix(in srgb,var(--cv-accent) 60%,transparent);outline-offset:3pt}
+.cv.editable .cv-badge.dragging,.cv.editable .cv-badge.dragging .cv-badge-ic{cursor:grabbing}
+.cv.editable [data-badge-text]{min-width:2ch;border-radius:2pt;outline:none}
+.cv.editable [data-badge-text]:focus{background:rgba(76,81,184,.14)}
+
 /* Right-to-left CVs (Arabic): grids and flex rows mirror by themselves; these fix what doesn't */
 .cv[dir="rtl"].tpl-harbor{background-position:calc(100% - 34pt) 46pt}
 .cv[dir="rtl"] .cv-head,.cv[dir="rtl"] .cv-section>h2{text-align:start}
@@ -273,3 +409,4 @@
 /* while editing: headings and the date word can be clicked and changed */
 .cv.editable [data-heading],.cv.editable [data-word]{cursor:text;border-radius:2pt}
 .cv.editable [data-heading]:hover,.cv.editable [data-word]:hover{outline:1pt dashed color-mix(in srgb,var(--cv-accent) 55%,transparent);outline-offset:1.5pt}
+.cv[dir="rtl"].tpl-coast .cv-top{background:linear-gradient(255deg,var(--cv-accent) 0 64%,color-mix(in srgb,var(--cv-accent) 68%,#000) 64% 100%)}

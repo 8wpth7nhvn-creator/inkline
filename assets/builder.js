@@ -2,7 +2,7 @@
    in a form yourself. Both edit the same CV, shown live in any design, with an optional photo. */
 (function () {
   'use strict';
-  const { TEMPLATES, ACCENTS, FONTS, LANGS, SECTION_KEYS, EXTRA_PRESETS, SAMPLE, ICONS, fontById, fontHref, langById, sectionTitle, dateWord, translateCV, emptyCV, render, normalize, setPath, plainText, templateById, esc } = window.InklineCV;
+  const { TEMPLATES, ACCENTS, FONTS, LANGS, readableAccent, accentValue, isHex, SECTION_KEYS, EXTRA_PRESETS, SAMPLE, ICONS, fontById, fontHref, langById, sectionTitle, dateWord, translateCV, emptyCV, render, normalize, setPath, plainText, templateById, esc } = window.InklineCV;
   const $ = s => document.querySelector(s);
   const app = $('.app'), log = $('#log'), quick = $('#quick'), answer = $('#answer'), sendBtn = $('#send');
   const sheet = $('#sheet'), frame = $('#frame'), desk = $('#desk'), formEl = $('#form');
@@ -26,6 +26,7 @@
       photoCrop: null,       // where the crop sits in it: centre x, centre y (0 to 1) and zoom
       font: 'default', sizes: { name: 1, head: 1, text: 1 },
       sections: cleanSections(),   // heading language, renamed or hidden sections, the word between dates
+      badges: [],            // icons with text placed anywhere on the page
       started: false,
       pane: 'chat',          // 'chat' or 'form'
       mode: null,            // in the chat: 'ai' or 'guided'
@@ -43,11 +44,12 @@
       if (s && s.v === 1) {
         s.cv = normalize(s.cv);
         if (templateById(s.template).id !== s.template) s.template = 'atlas';
-        if (!ACCENTS.some(a => a.id === s.accent)) s.accent = templateById(s.template).accent;
+        if (!isHex(s.accent) && !ACCENTS.some(a => a.id === s.accent)) s.accent = templateById(s.template).accent;
         if (!safePhoto(s.photo)) s.photo = '';
         if (!safePhoto(s.photoSrc) || !s.photo) s.photoSrc = '';
         s.photoCrop = cleanCrop(s.photoCrop);
         s.sections = cleanSections(s.sections);
+        s.badges = cleanBadges(s.badges);
         delete s.history;   // older versions kept the chat history in the browser
         if (typeof s.conversation !== 'string') s.conversation = null;
         if (s.started === undefined) s.started = !!(s.chat && s.chat.length);
@@ -69,6 +71,13 @@
       if (x.hidden && x.hidden[k] === true) hidden[k] = true;
     });
     return { lang: langById(x.lang).id, titles, hidden, to: str(x.to, 20) };
+  }
+  function cleanBadges(list) {
+    const n = (v, hi) => Math.max(0, Math.min(hi, Number(v) || 0));
+    return (Array.isArray(list) ? list : []).slice(0, 24).map(b => b && typeof b === 'object' && window.InklineIcons.byId(b.icon) ? {
+      icon: b.icon, text: typeof b.text === 'string' ? b.text.slice(0, 120) : '', x: n(b.x, 600), y: n(b.y, 6000),
+      tone: ['dark', 'light', 'accent'].includes(b.tone) ? b.tone : 'dark', size: ['s', 'm', 'l'].includes(b.size) ? b.size : 'm', auto: b.auto !== false
+    } : null).filter(Boolean);
   }
   function cleanCrop(c) {
     if (!c || typeof c !== 'object') return null;
@@ -96,7 +105,7 @@
   // ---------- preview ----------
   let renderedHTML = '';
   function opts(extra) {
-    return Object.assign({ template: state.template, accent: state.accent, paper: state.paper, photo: state.photo, font: state.font, sizes: state.sizes, sections: state.sections }, extra || {});
+    return Object.assign({ template: state.template, accent: state.accent, paper: state.paper, photo: state.photo, font: state.font, sizes: state.sizes, sections: state.sections, badges: state.badges }, extra || {});
   }
   function renderCV(flash) {
     const html = render(state.cv, opts({ editable: true }));
@@ -144,6 +153,14 @@
     if (el && el.classList.contains('cv-empty')) { el.textContent = ''; el.classList.remove('cv-empty'); }
   });
   sheet.addEventListener('input', e => {
+    const bt = e.target.closest('[data-badge-text]');
+    if (bt) {
+      const b = state.badges[+bt.dataset.badgeText];
+      if (b) b.text = bt.textContent.replace(/\s+/g, ' ').trim().slice(0, 120);
+      document.querySelectorAll(`[data-badge-input="${bt.dataset.badgeText}"]`).forEach(x => { x.value = b ? b.text : ''; });
+      save();
+      return;
+    }
     const hd = e.target.closest('[data-heading]'), word = e.target.closest('[data-word]');
     if (hd || word) {
       const text = (hd || word).textContent.replace(/\s+/g, ' ').trim();
@@ -173,7 +190,7 @@
   // Empty lines are tidied away only once the visitor leaves the CV, so the lines still being edited keep their places.
   let addingLine = false;
   sheet.addEventListener('focusout', e => {
-    if (addingLine || !e.target.closest('[data-path],[data-heading],[data-word]')) return;
+    if (addingLine || !e.target.closest('[data-path],[data-heading],[data-word],[data-badge-text]')) return;
     setTimeout(() => {
       if (sheet.contains(document.activeElement)) return;
       state.cv = normalize(state.cv);
@@ -181,6 +198,7 @@
       renderCV(false);
       if (state.pane === 'form') buildForm();
       if (!sectionsPanel.hidden) refreshSectionsPanel();
+      refreshIconsPanel();
     }, 0);
   });
   sheet.addEventListener('keydown', e => {
@@ -201,12 +219,12 @@
       save();
       return;
     }
-    if (e.key === 'Enter' && e.target.closest('[data-path],[data-heading],[data-word]')) { e.preventDefault(); e.target.blur(); }
+    if (e.key === 'Enter' && e.target.closest('[data-path],[data-heading],[data-word],[data-badge-text]')) { e.preventDefault(); e.target.blur(); }
     if ((e.key === 'Enter' || e.key === ' ') && e.target.closest('[data-action="photo"]')) { e.preventDefault(); photoClicked(); }
   });
   sheet.addEventListener('click', e => { if (e.target.closest('[data-action="photo"]')) photoClicked(); });
   sheet.addEventListener('paste', e => {
-    if (!e.target.closest('[data-path],[data-heading],[data-word]')) return;
+    if (!e.target.closest('[data-path],[data-heading],[data-word],[data-badge-text]')) return;
     e.preventDefault();
     const text = (e.clipboardData || window.clipboardData).getData('text');
     document.execCommand('insertText', false, text.replace(/\s+/g, ' '));
@@ -383,12 +401,23 @@
       b.addEventListener('click', () => { state.accent = a.id; save(); syncToolbar(); renderCV(false); });
       ag.appendChild(b);
     });
+    $('#accent-custom').addEventListener('input', e => {
+      if (!isHex(e.target.value)) return;
+      state.accent = e.target.value.toLowerCase();
+      save(); syncToolbar(); renderSoon();
+    });
     document.querySelectorAll('#paper button').forEach(b => b.addEventListener('click', () => {
       state.paper = b.dataset.paper; save(); syncToolbar(); renderCV(false);
     }));
   }
   function syncToolbar() {
     document.querySelectorAll('#accents button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.id === state.accent)));
+    const shown = accentValue(state.accent || templateById(state.template).accent);
+    $('#colour-dot').style.background = shown;
+    $('#accent-custom').value = isHex(state.accent) ? state.accent : shown;
+    $('#custom-note').textContent = isHex(state.accent) && readableAccent(state.accent) !== state.accent.toLowerCase()
+      ? 'That colour was darkened a little, so white text on it stays easy to read.'
+      : 'Very light colours are darkened a little, so white text on them stays easy to read.';
     document.querySelectorAll('#paper button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.paper === state.paper)));
     // Colourful two-column designs print edge to edge so the sidebar reaches the bottom of the page.
     // Classic designs keep a margin on later pages so long CVs read well.
@@ -578,12 +607,40 @@
   });
   const textPanel = $('#text-panel');
   function openTextPanel() {
+    PANELS.forEach(closePanel);
     if (typeof closeSectionsPanel === 'function' && !sectionsPanel.hidden) closeSectionsPanel();
     FONTS.forEach(f => ensureFont(f.id));   // so every option previews in its own font
     $('#text-panel-body').innerHTML = textControls('tp');
     textPanel.hidden = false;
     $('#text-btn').setAttribute('aria-expanded', 'true');
   }
+  // Toolbar panels (fonts, colour, icons, sections): one open at a time, closed by Done, Escape or a click outside.
+  const PANELS = [];
+  function togglePanel(btn, el, onOpen) {
+    const p = { btn, el, onOpen };
+    PANELS.push(p);
+    btn.addEventListener('click', () => { if (el.hidden) openPanel(p); else closePanel(p); });
+    return p;
+  }
+  function openPanel(p) {
+    PANELS.forEach(q => { if (q !== p) closePanel(q); });
+    closeTextPanel();
+    if (!sectionsPanel.hidden) closeSectionsPanel();
+    if (p.onOpen) p.onOpen();
+    p.el.hidden = false;
+    p.btn.setAttribute('aria-expanded', 'true');
+  }
+  function closePanel(p) {
+    if (p.el.hidden) return;
+    p.el.hidden = true;
+    p.btn.setAttribute('aria-expanded', 'false');
+  }
+  addEventListener('keydown', e => { if (e.key === 'Escape') PANELS.forEach(closePanel); });
+  document.addEventListener('pointerdown', e => {
+    PANELS.forEach(p => { if (!p.el.hidden && !p.el.contains(e.target) && !p.btn.contains(e.target)) closePanel(p); });
+  });
+  const colourPanelP = togglePanel($('#colour-btn'), $('#colour-panel'), syncToolbar);
+  $('#colour-close').addEventListener('click', () => closePanel(colourPanelP));
   function closeTextPanel() {
     textPanel.hidden = true;
     $('#text-btn').setAttribute('aria-expanded', 'false');
@@ -635,6 +692,7 @@
   function refreshSectionsPanel() { $('#sections-panel-body').innerHTML = sectionControls('sp', true); }
   function openSectionsPanel() {
     closeTextPanel();
+    PANELS.forEach(closePanel);
     refreshSectionsPanel();
     sectionsPanel.hidden = false;
     $('#sections-btn').setAttribute('aria-expanded', 'true');
@@ -723,6 +781,156 @@
       afterSectionChange(true);
     }
   });
+
+  // ---------- icons and links placed anywhere on the CV ----------
+  const ICONSET = window.InklineIcons;
+  function iconsControls() {
+    const tile = ic => `<button type="button" class="ic-add" data-badge-add="${ic.id}">${ic.svg || '<span class="ic-txt" aria-hidden="true">Aa</span>'}<span>${esc(ic.name)}</span></button>`;
+    const opt = (v, label, cur) => `<option value="${v}"${v === cur ? ' selected' : ''}>${label}</option>`;
+    const placed = state.badges.map((b, i) => {
+      const ic = ICONSET.byId(b.icon);
+      return `<li>
+        <span class="ic-mark" aria-hidden="true">${ic.svg || '<b>Aa</b>'}</span>
+        <input class="f-in" data-badge-input="${i}" value="${esc(b.text)}" placeholder="${esc(ic.ph)}" aria-label="Text next to the ${esc(ic.name)} icon" dir="auto" maxlength="120">
+        <button type="button" class="small-btn" data-badge-del="${i}">Remove</button>
+        <div class="ic-opts">
+          <select data-badge-tone="${i}" aria-label="Colour of the ${esc(ic.name)} icon">${opt('dark', 'Dark', b.tone)}${opt('light', 'White, for dark areas', b.tone)}${ic.brand ? '' : opt('accent', 'Design colour', b.tone)}</select>
+          <select data-badge-size="${i}" aria-label="Size of the ${esc(ic.name)} icon">${opt('s', 'Small', b.size)}${opt('m', 'Medium', b.size)}${opt('l', 'Large', b.size)}</select>
+        </div>
+      </li>`;
+    }).join('');
+    return `<p class="ic-hint">Tap an icon to put it on your CV. Then drag it anywhere on the page and type your text next to it.</p>
+      ${placed ? `<h3 class="ic-sub">On your CV</h3><ul class="ic-list">${placed}</ul>` : ''}
+      <h3 class="ic-sub">Everyday</h3><div class="ic-grid">${ICONSET.GENERAL.map(tile).join('')}</div>
+      <h3 class="ic-sub">Social media and sites</h3><div class="ic-grid">${ICONSET.BRANDS.map(tile).join('')}</div>
+      <p class="ic-hint" style="margin-top:14px">Logos belong to their companies. They're shown unchanged, in dark or white, to point to your own profiles.</p>`;
+  }
+  const iconsPanelP = togglePanel($('#icons-btn'), $('#icons-panel'), () => { $('#icons-panel-body').innerHTML = iconsControls(); });
+  $('#icons-close').addEventListener('click', () => closePanel(iconsPanelP));
+  function refreshIconsPanel() { if (!iconsPanelP.el.hidden) $('#icons-panel-body').innerHTML = iconsControls(); }
+
+  // Is the page dark under this point (a coloured sidebar or header)? Then an icon there is best in white.
+  function darkUnder(x, y) {
+    const rgb = str => {
+      let m = str.match(/rgba?\(([^)]+)\)/);
+      if (m) { const v = m[1].split(/[\s,/]+/).filter(Boolean).map(Number); return { c: v.slice(0, 3), a: v.length > 3 ? v[3] : 1 }; }
+      m = str.match(/color\(srgb ([^)]+)\)/);
+      if (m) { const v = m[1].split(/[\s/]+/).filter(Boolean).map(Number); return { c: v.slice(0, 3).map(n => n * 255), a: v.length > 3 ? v[3] : 1 }; }
+      return null;
+    };
+    for (const el of document.elementsFromPoint(x, y)) {
+      if (el.closest('.cv-badges')) continue;
+      if (!sheet.contains(el)) break;
+      const cs = getComputedStyle(el), bg = rgb(cs.backgroundColor);
+      if (bg && bg.a > 0.5) return (0.2126 * bg.c[0] + 0.7152 * bg.c[1] + 0.0722 * bg.c[2]) / 255 < 0.45;
+      if (/gradient/.test(cs.backgroundImage) && el.matches('.cv-side,.cv-top')) return true;
+    }
+    return false;
+  }
+  // Icons the visitor hasn't given a colour themselves turn white over dark areas, and dark again over light ones.
+  function autoTone(i) {
+    const b = state.badges[i], el = sheet.querySelector(`[data-badge="${i}"]`);
+    if (!b || !b.auto || !el) return;
+    const r = el.getBoundingClientRect();
+    b.tone = darkUnder(r.left + r.width / 2, r.top + r.height / 2) ? 'light' : 'dark';
+  }
+  function addBadge(id) {
+    const ic = ICONSET.byId(id);
+    if (!ic) return;
+    if (state.badges.length >= 24) { toast('You can place up to 24 icons on your CV.'); return; }
+    closePanel(iconsPanelP);
+    if (mobile()) $('#tab-cv').click();   // the CV must be showing to see what lies under the new icon
+    // starts near the top right of the part of the CV in view, a little lower for each new one
+    const cvEl = sheet.firstElementChild, scale = sheet.getBoundingClientRect().width / sheet.offsetWidth;
+    const inView = Math.max(0, (desk.getBoundingClientRect().top - sheet.getBoundingClientRect().top) / scale) * 0.75;
+    const n = state.badges.length;
+    state.badges.push({ icon: id, text: '', x: Math.max(16, cvEl.offsetWidth * 0.75 - 200), y: inView + 34 + (n % 8) * 22, tone: 'dark', size: 'm', auto: true });
+    const i = state.badges.length - 1;
+    renderedHTML = '';
+    renderCV(false);
+    autoTone(i);
+    renderedHTML = '';
+    renderCV(false);
+    save();
+    const text = sheet.querySelector(`[data-badge-text="${i}"]`);
+    if (text) { revealOnCV(text); text.focus({ preventScroll: true }); }
+    toast(`${ic.name} added. Drag the ${ic.svg ? 'icon' : 'dots'} to move it, and type your text next to it.`);
+  }
+  document.addEventListener('click', e => {
+    const add = e.target.closest('[data-badge-add]'), del = e.target.closest('[data-badge-del]');
+    if (add) addBadge(add.dataset.badgeAdd);
+    else if (del) { state.badges.splice(+del.dataset.badgeDel, 1); save(); renderedHTML = ''; renderCV(false); refreshIconsPanel(); }
+  });
+  document.addEventListener('input', e => {
+    const t = e.target.closest('[data-badge-input]');
+    if (!t) return;
+    const b = state.badges[+t.dataset.badgeInput];
+    if (!b) return;
+    b.text = t.value.slice(0, 120);
+    save(); renderSoon();
+  });
+  document.addEventListener('change', e => {
+    const tone = e.target.closest('[data-badge-tone]'), size = e.target.closest('[data-badge-size]');
+    if (tone) { const b = state.badges[+tone.dataset.badgeTone]; if (b) { b.tone = tone.value; b.auto = false; } }
+    else if (size) { const b = state.badges[+size.dataset.badgeSize]; if (b) b.size = size.value; }
+    else return;
+    save(); renderCV(false);
+  });
+  // dragging an icon around the page (mouse, finger or pen)
+  let drag = null;
+  sheet.addEventListener('pointerdown', e => {
+    const h = e.target.closest('[data-badge-drag]');
+    if (!h || e.button > 0) return;
+    e.preventDefault();
+    const i = +h.dataset.badgeDrag, b = state.badges[i], el = h.closest('.cv-badge'), cvEl = sheet.firstElementChild;
+    if (!b) return;
+    const scale = sheet.getBoundingClientRect().width / sheet.offsetWidth;
+    drag = { i, el, h, x: e.clientX, y: e.clientY, bx: b.x, by: b.y, k: 0.75 / scale, moved: false,
+      maxX: Math.max(0, (cvEl.offsetWidth - el.offsetWidth) * 0.75), maxY: Math.max(0, (cvEl.offsetHeight - el.offsetHeight) * 0.75) };
+    el.classList.add('dragging');
+    try { h.setPointerCapture(e.pointerId); } catch (err) { /* older browsers */ }
+  });
+  sheet.addEventListener('pointermove', e => {
+    if (!drag) return;
+    const b = state.badges[drag.i];
+    const dx = (e.clientX - drag.x) * drag.k, dy = (e.clientY - drag.y) * drag.k;
+    if (Math.abs(dx) + Math.abs(dy) > 1.5) drag.moved = true;
+    b.x = Math.min(drag.maxX, Math.max(0, drag.bx + dx));
+    b.y = Math.min(drag.maxY, Math.max(0, drag.by + dy));
+    drag.el.style.left = b.x.toFixed(1) + 'pt';
+    drag.el.style.top = b.y.toFixed(1) + 'pt';
+  });
+  const endDrag = () => {
+    if (!drag) return;
+    const { i, el, moved } = drag;
+    drag = null;
+    el.classList.remove('dragging');
+    if (moved) { autoTone(i); save(); renderCV(false); }
+    else { const t = sheet.querySelector(`[data-badge-text="${i}"]`); if (t) t.focus(); }
+  };
+  sheet.addEventListener('pointerup', endDrag);
+  sheet.addEventListener('pointercancel', endDrag);
+  // keyboard: arrow keys move a focused icon, Delete removes it
+  sheet.addEventListener('keydown', e => {
+    const h = e.target.closest('[data-badge-drag]');
+    if (!h) return;
+    const i = +h.dataset.badgeDrag, b = state.badges[i];
+    if (!b) return;
+    const step = e.shiftKey ? 10 : 2;
+    const moves = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
+    if (moves[e.key]) {
+      e.preventDefault();
+      b.x = Math.max(0, Math.min(600, b.x + moves[e.key][0]));
+      b.y = Math.max(0, Math.min(6000, b.y + moves[e.key][1]));
+      const el = h.closest('.cv-badge');
+      el.style.left = b.x.toFixed(1) + 'pt'; el.style.top = b.y.toFixed(1) + 'pt';
+      save();
+    } else if (e.key === 'Delete' || e.key === 'Backspace') {
+      e.preventDefault();
+      state.badges.splice(i, 1);
+      save(); renderedHTML = ''; renderCV(false); refreshIconsPanel();
+    }
+  }, true);
 
   // ---------- the form editor ----------
   const I = {
@@ -1200,7 +1408,7 @@
     extras:   { stage: 'extras', ask: () => 'Anything else worth adding? Certifications, volunteering, projects or awards. Put each on a new line.', quick: ['Skip'] },
     summary:  { stage: 'extras', ask: () => 'Last one. In a sentence or two, what makes you good at this kind of work?', quick: ['Write one for me'] },
     whatsNew: { stage: 'review', ask: g => g.addJob || g.addEdu ? 'Anything else that has changed?' : 'What has changed since you wrote it? I can add a new job or qualification for you. For anything else, click the text on your CV and type.', quick: ['Add a new job', 'Add a qualification', 'Nothing else'] },
-    review:   { stage: 'review', ask: () => 'Your CV is ready. Here it is in a few designs. Tap the one you like, and you can still change anything afterwards.', quick: [{ label: 'See all 11 designs', act: 'picker' }, { label: 'Edit it myself', act: 'form' }, 'Start a new CV'], after: () => designsBubble(suggestedFor()) }
+    review:   { stage: 'review', ask: () => 'Your CV is ready. Here it is in a few designs. Tap the one you like, and you can still change anything afterwards.', quick: [{ label: `See all ${TEMPLATES.length} designs`, act: 'picker' }, { label: 'Edit it myself', act: 'form' }, 'Start a new CV'], after: () => designsBubble(suggestedFor()) }
   };
 
   const MISSING = {
@@ -1336,7 +1544,7 @@
           <span class="d-mini" aria-hidden="true">${render(state.cv, opts({ template: id, accent: t.accent, editable: false }))}</span>
           <b>${esc(t.name)}</b></button>`;
       }).join('')}</div>
-      <button type="button" class="d-all" data-act="picker">See all 11 designs</button>`;
+      <button type="button" class="d-all" data-act="picker">See all ${TEMPLATES.length} designs</button>`;
     const prev = log.lastElementChild;
     if (!prev || !prev.classList.contains('ai')) {
       const label = document.createElement('div');
@@ -1824,7 +2032,7 @@
     [/cover letter/i, 'A short cover letter helps: three short paragraphs saying why this job, what you bring, and that you would love to talk.'],
     [/free|cost|price|pay for|charge/i, 'Inkline is free. No card, no trial and no watermark on your PDF.'],
     [/font|text size|bigger|smaller/i, 'Use the Fonts & size button above your CV to pick a font and make the name, headings or text bigger or smaller.'],
-    [/design|template|layout|colou?r|style/i, 'Press the Design button above your CV to see all 11 designs. You can change the colour there too.'],
+    [/design|template|layout|colou?r|style/i, `Press the Design button above your CV to see all ${TEMPLATES.length} designs. The Colour button next to it has ${ACCENTS.length} colours, or pick any colour you like.`],
     [/download|pdf|save|print/i, 'When your CV is ready, press Download PDF above it and choose Save as PDF.'],
     [/upload|old cv|existing cv|import/i, 'You can upload your old CV with the paperclip button next to the message box.'],
     [/edit|change|fix|mistake|typo/i, 'Click any text on your CV and type to change it, or switch to Fill in myself to edit everything in a simple form.'],

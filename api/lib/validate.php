@@ -3,7 +3,8 @@
 declare(strict_types=1);
 if (!defined('INKLINE')) { http_response_code(404); exit; }
 
-const TEMPLATE_IDS = ['atlas', 'vertex', 'sage', 'bloom', 'noir', 'horizon', 'indigo', 'harbor', 'folio', 'meridian', 'ledger'];
+const TEMPLATE_IDS = ['atlas', 'vertex', 'sage', 'bloom', 'noir', 'horizon', 'prism', 'coast', 'ember', 'linen', 'petal',
+    'indigo', 'harbor', 'folio', 'meridian', 'ledger', 'summit', 'mono', 'marker', 'swiss'];
 const STAGES = ['basics', 'target', 'contact', 'experience', 'education', 'skills', 'extras', 'review', 'done'];
 
 // Plain text only: valid UTF-8, no control characters, trimmed to a maximum length.

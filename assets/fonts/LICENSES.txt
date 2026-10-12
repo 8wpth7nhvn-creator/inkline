@@ -1,0 +1,7 @@
+Fonts served by Inkline (from Google Fonts, stored on this site so visitors never connect to Google).
+All are licensed under the SIL Open Font License 1.1: https://openfontlicense.org
+
+Gloock, Hanken Grotesk, Newsreader, Spline Sans Mono, Lato, Playfair Display, Montserrat, Open Sans,
+Nunito, Merriweather, Source Sans 3, DM Sans, Poppins, Inter, Work Sans, Raleway, Space Grotesk,
+IBM Plex Sans, Oswald, Barlow, EB Garamond, Lora, Libre Baskerville, Cairo, Amiri.
+Each family's copyright belongs to its designers, as listed on fonts.google.com.

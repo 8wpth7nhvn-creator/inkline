@@ -212,6 +212,31 @@ textarea.f-in{resize:vertical;min-height:84px}
 @media (max-width:560px){.sc-to{grid-template-columns:auto 1fr}.sc-example{grid-column:1 / -1}}
 @media (max-width:980px){.text-panel{position:fixed;top:64px;left:12px;right:12px;width:auto;max-height:calc(100dvh - 150px)}}
 
+/* colour panel */
+.mini-av.dot{width:20px;height:20px;border-radius:50%;box-shadow:inset 0 0 0 2px rgba(255,255,255,.65)}
+.swatches.big{display:grid;grid-template-columns:repeat(auto-fill,minmax(34px,1fr));gap:9px}
+.swatches.big button{width:34px;height:34px}
+.custom-colour{display:grid;grid-template-columns:auto 56px;align-items:center;gap:8px 12px;margin-top:16px}
+.custom-colour label{font-size:14px;font-weight:600;color:var(--text-2)}
+.custom-colour input{width:56px;height:36px;padding:2px;border:1px solid var(--line-strong);border-radius:10px;background:#fff;cursor:pointer}
+.custom-colour .hint{grid-column:1 / -1;margin:0;font-size:13px;color:var(--text-2)}
+
+/* icons panel */
+.ic-hint{margin:0 0 12px;font-size:13.5px;color:var(--text-2);line-height:1.45}
+.ic-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:7px}
+.ic-add{display:flex;flex-direction:column;align-items:center;gap:5px;padding:9px 4px 8px;border:1px solid var(--line);border-radius:12px;background:#fff;font-size:12.5px;line-height:1.2;color:var(--text);text-align:center;transition:border-color .2s var(--ease),background-color .2s var(--ease)}
+.ic-add:hover{border-color:var(--violet);background:rgba(76,81,184,.05)}
+.ic-add svg{width:22px;height:22px;color:var(--text)}
+.ic-add .ic-txt{font:600 15px/22px var(--display);height:22px}
+.ic-sub{margin:18px 0 8px;font-size:15px;font-weight:600}
+.ic-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.ic-list li{display:grid;grid-template-columns:28px 1fr auto;align-items:center;gap:8px}
+.ic-list .ic-mark svg{width:20px;height:20px;display:block}
+.ic-list .f-in{padding:8px 10px}
+.ic-opts{grid-column:2 / -1;display:flex;flex-wrap:wrap;gap:6px}
+.ic-opts select{padding:6px 8px;border:1px solid var(--line-strong);border-radius:9px;background:#fff;font-size:13.5px}
+.ic-list .small-btn{padding:8px 12px;background:transparent;color:var(--text-2);border:1px solid var(--line-strong)}
+
 /* cropping the photo */
 .cropper{position:fixed;inset:0;z-index:60;display:grid;place-items:center;padding:16px;background:rgba(16,18,63,.55);backdrop-filter:blur(4px);animation:fadeIn .25s var(--ease-out)}
 .crop-box{width:min(420px,100%);max-height:100%;overflow-y:auto;background:#fff;border-radius:22px;padding:18px 18px 20px;box-shadow:0 40px 80px -30px rgba(16,18,63,.6)}
@@ -279,8 +304,8 @@ textarea.f-in{resize:vertical;min-height:84px}
 @media (max-width:1240px){.steps{display:none}.steps+.top-right{margin-left:auto}}
 @media (max-width:980px){
   .top{padding:10px 14px}
-  main{grid-template-columns:1fr;position:relative}
-  .editor,.preview{grid-area:1/1;border-right:0}
+  main{grid-template-columns:minmax(0,1fr);position:relative}
+  .editor,.preview{grid-area:1/1;border-right:0;min-width:0}
   .app[data-tab="edit"] .preview,.app[data-tab="cv"] .editor{visibility:hidden;pointer-events:none}
   .tabs{display:flex;gap:6px;padding:8px 12px calc(8px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:var(--panel)}
   .tabs button{flex:1;border:0;background:transparent;border-radius:12px;padding:12px;font-weight:600;color:var(--text-2);position:relative}
@@ -366,7 +391,8 @@ textarea.f-in{resize:vertical;min-height:84px}
         <button class="photo-btn" id="text-btn" type="button" aria-haspopup="dialog" aria-expanded="false"><span class="mini-av aa" aria-hidden="true">Aa</span><span id="text-label">Fonts &amp; size</span></button>
         <button class="photo-btn" id="sections-btn" type="button" aria-haspopup="dialog" aria-expanded="false"><span class="mini-av sec" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/></svg></span><span>Sections</span></button>
         <button class="photo-btn" id="photo-btn" type="button"><span class="mini-av" id="photo-mini" aria-hidden="true"></span><span id="photo-label">Add photo</span></button>
-        <div class="group"><span id="lbl-colour">Colour</span><div class="swatches" id="accents" role="group" aria-labelledby="lbl-colour"></div></div>
+        <button class="photo-btn" id="colour-btn" type="button" aria-haspopup="dialog" aria-expanded="false"><span class="mini-av dot" id="colour-dot" aria-hidden="true"></span><span>Colour</span></button>
+        <button class="photo-btn" id="icons-btn" type="button" aria-haspopup="dialog" aria-expanded="false"><span class="mini-av sec" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.4 2.5 3.6 5.3 3.6 8.5s-1.2 6-3.6 8.5c-2.4-2.5-3.6-5.3-3.6-8.5s1.2-6 3.6-8.5z"/></svg></span><span>Icons &amp; links</span></button>
         <div class="group"><span id="lbl-paper">Paper</span><div class="seg" id="paper" role="group" aria-labelledby="lbl-paper"><button type="button" data-paper="a4">A4</button><button type="button" data-paper="letter">US Letter</button></div></div>
         <div class="actions">
           <button class="ghost" id="copy" type="button">Copy as text</button>
@@ -381,6 +407,21 @@ textarea.f-in{resize:vertical;min-height:84px}
       <div class="text-panel" id="text-panel" role="dialog" aria-labelledby="text-title" hidden>
         <div class="tp-head"><h2 id="text-title">Fonts and text size</h2><button class="ghost" id="text-close" type="button">Done</button></div>
         <div id="text-panel-body"></div>
+      </div>
+
+      <div class="text-panel" id="colour-panel" role="dialog" aria-labelledby="colour-title" hidden>
+        <div class="tp-head"><h2 id="colour-title">Colour</h2><button class="ghost" id="colour-close" type="button">Done</button></div>
+        <div class="swatches big" id="accents" role="group" aria-label="Ready-made colours"></div>
+        <div class="custom-colour">
+          <label for="accent-custom">Or pick any colour</label>
+          <input type="color" id="accent-custom" value="#2b2f8f">
+          <span class="hint" id="custom-note">Very light colours are darkened a little, so white text on them stays easy to read.</span>
+        </div>
+      </div>
+
+      <div class="text-panel" id="icons-panel" role="dialog" aria-labelledby="icons-title" hidden>
+        <div class="tp-head"><h2 id="icons-title">Icons and links</h2><button class="ghost" id="icons-close" type="button">Done</button></div>
+        <div id="icons-panel-body"></div>
       </div>
 
       <div class="text-panel" id="sections-panel" role="dialog" aria-labelledby="sections-title" hidden>
@@ -454,6 +495,7 @@ textarea.f-in{resize:vertical;min-height:84px}
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <div id="print-root" aria-hidden="true"></div>
 
+<script src="assets/cv-icons.js"></script>
 <script src="assets/cv.js"></script>
 <script src="assets/builder.js"></script>
 </body>

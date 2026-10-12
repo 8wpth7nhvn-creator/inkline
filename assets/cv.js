@@ -18,11 +18,25 @@
       top: [], main: ['head', 'profile', 'experience', 'education'], side: ['photo', 'contact', 'skills', 'languages', 'extras'] },
     { id: 'horizon', name: 'Horizon', note: 'Timeline layout',           group: 'photo', photo: true, accent: 'ochre', layout: 'two',
       top: ['photo', 'head', 'contactInline'], main: ['profile', 'experience', 'extras'], side: ['education', 'skills', 'languages'] },
+    { id: 'prism',   name: 'Prism',   note: 'Gradient sidebar, bold labels', group: 'photo', photo: true, accent: 'violet', layout: 'two',
+      top: [], main: ['head', 'profile', 'experience', 'education', 'extras'], side: ['photo', 'contact', 'skills', 'languages'] },
+    { id: 'coast',   name: 'Coast',   note: 'Two-tone slanted header',   group: 'photo', photo: true, accent: 'ocean', layout: 'two',
+      top: ['head', 'photo'], main: ['profile', 'experience', 'extras'], side: ['contact', 'skills', 'languages', 'education'] },
+    { id: 'ember',   name: 'Ember',   note: 'Magazine photo on top',     group: 'photo', photo: true, accent: 'crimson', layout: 'two',
+      top: [], main: ['head', 'profile', 'experience', 'extras'], side: ['photo', 'contact', 'education', 'skills', 'languages'] },
+    { id: 'linen',   name: 'Linen',   note: 'Warm paper, centred',       group: 'photo', photo: true, accent: 'mocha', layout: 'two',
+      top: ['photo', 'head', 'contactInline'], main: ['profile', 'experience', 'extras'], side: ['education', 'skills', 'languages'] },
+    { id: 'petal',   name: 'Petal',   note: 'Soft cards on a tint',      group: 'photo', photo: true, accent: 'emerald', layout: 'two',
+      top: ['photo', 'head', 'contactInline'], main: ['profile', 'experience', 'education', 'extras'], side: ['skills', 'languages'] },
     { id: 'indigo',   name: 'Indigo',   note: 'Ink serif, quiet rules',       group: 'classic', photo: false, accent: 'indigo', layout: 'one' },
     { id: 'harbor',   name: 'Harbor',   note: 'Clean and modern',             group: 'classic', photo: false, accent: 'navy',   layout: 'one' },
     { id: 'folio',    name: 'Folio',    note: 'Classic, centred',             group: 'classic', photo: false, accent: 'ink',    layout: 'one' },
     { id: 'meridian', name: 'Meridian', note: 'Colour header, photo if you like', group: 'classic', photo: true, accent: 'plum', layout: 'one' },
-    { id: 'ledger',   name: 'Ledger',   note: 'Compact, fits more',           group: 'classic', photo: false, accent: 'seal',   layout: 'one' }
+    { id: 'ledger',   name: 'Ledger',   note: 'Compact, fits more',           group: 'classic', photo: false, accent: 'seal',   layout: 'one' },
+    { id: 'summit',   name: 'Summit',   note: 'Headings in the margin',       group: 'classic', photo: false, accent: 'slate',  layout: 'one' },
+    { id: 'mono',     name: 'Mono',     note: 'Typewriter, ruled',            group: 'classic', photo: false, accent: 'ink',    layout: 'one' },
+    { id: 'marker',   name: 'Marker',   note: 'Big name, highlighter',        group: 'classic', photo: false, accent: 'royal',  layout: 'one' },
+    { id: 'swiss',    name: 'Swiss',    note: 'Numbered sections, strong bar', group: 'classic', photo: false, accent: 'forest', layout: 'one' }
   ];
 
   // Every colour is dark enough for white text on top of it.
@@ -35,8 +49,28 @@
     { id: 'seal',   name: 'Terracotta', value: '#A2412A' },
     { id: 'rose',   name: 'Rose',       value: '#94455E' },
     { id: 'plum',   name: 'Plum',       value: '#6B2A5E' },
-    { id: 'ink',    name: 'Charcoal',   value: '#25272F' }
+    { id: 'ink',    name: 'Charcoal',   value: '#25272F' },
+    { id: 'royal',  name: 'Royal blue', value: '#1D4ED8' },
+    { id: 'ocean',  name: 'Ocean',      value: '#0B5C8A' },
+    { id: 'emerald',name: 'Emerald',    value: '#047857' },
+    { id: 'forest', name: 'Forest',     value: '#2E5631' },
+    { id: 'olive',  name: 'Olive',      value: '#5A6618' },
+    { id: 'crimson',name: 'Crimson',    value: '#9F1239' },
+    { id: 'burgundy',name: 'Burgundy',  value: '#7A1F3D' },
+    { id: 'violet', name: 'Violet',     value: '#5B2DB0' },
+    { id: 'slate',  name: 'Slate',      value: '#37475A' },
+    { id: 'mocha',  name: 'Mocha',      value: '#6B4A33' }
   ];
+  // Any colour a visitor picks is darkened just enough for white text on it to stay easy to read.
+  function readableAccent(hex) {
+    let [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
+    const lum = () => [r, g, b].map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); })
+      .reduce((s, v, i) => s + v * [0.2126, 0.7152, 0.0722][i], 0);
+    for (let n = 0; n < 40 && 1.05 / (lum() + 0.05) < 4.6; n++) [r, g, b] = [r, g, b].map(v => Math.round(v * 0.93));
+    return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
+  }
+  const isHex = v => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v);
+  function accentValue(id) { return isHex(id) ? readableAccent(id) : (ACCENTS.find(a => a.id === id) || ACCENTS[0]).value; }
 
   // Font pairs visitors can choose. 'default' keeps each design's own fonts.
   // `css` names the stylesheet in assets/fonts, loaded only when someone picks that pair ('' = already loaded).
@@ -48,7 +82,18 @@
     { id: 'bold',         name: 'Bold',         head: "'Montserrat',Arial,sans-serif", body: "'Open Sans',Arial,sans-serif", css: 'bold' },
     { id: 'friendly',     name: 'Friendly',     head: "'Nunito',Arial,sans-serif", body: "'Nunito',Arial,sans-serif", css: 'friendly' },
     { id: 'professional', name: 'Professional', head: "'Merriweather',Georgia,serif", body: "'Source Sans 3',Arial,sans-serif", css: 'professional' },
-    { id: 'minimal',      name: 'Minimal',      head: "'DM Sans',Arial,sans-serif", body: "'DM Sans',Arial,sans-serif", css: 'minimal' }
+    { id: 'minimal',      name: 'Minimal',      head: "'DM Sans',Arial,sans-serif", body: "'DM Sans',Arial,sans-serif", css: 'minimal' },
+    { id: 'geometric',    name: 'Geometric',    head: "'Poppins',Arial,sans-serif", body: "'Poppins',Arial,sans-serif", css: 'geometric' },
+    { id: 'neutral',      name: 'Neutral',      head: "'Inter',Arial,sans-serif", body: "'Inter',Arial,sans-serif", css: 'neutral' },
+    { id: 'studio',       name: 'Studio',       head: "'Work Sans',Arial,sans-serif", body: "'Work Sans',Arial,sans-serif", css: 'studio' },
+    { id: 'fashion',      name: 'Fashion',      head: "'Raleway',Arial,sans-serif", body: "'Raleway',Arial,sans-serif", css: 'fashion' },
+    { id: 'tech',         name: 'Tech',         head: "'Space Grotesk',Arial,sans-serif", body: "'IBM Plex Sans',Arial,sans-serif", css: 'tech' },
+    { id: 'condensed',    name: 'Condensed',    head: "'Oswald',Arial,sans-serif", body: "'Barlow',Arial,sans-serif", css: 'condensed' },
+    { id: 'book',         name: 'Book',         head: "'EB Garamond',Georgia,serif", body: "'EB Garamond',Georgia,serif", css: 'book' },
+    { id: 'warm',         name: 'Warm serif',   head: "'Lora',Georgia,serif", body: "'Lora',Georgia,serif", css: 'warm' },
+    { id: 'traditional',  name: 'Traditional',  head: "'Libre Baskerville',Georgia,serif", body: "'Source Sans 3',Arial,sans-serif", css: 'traditional' },
+    { id: 'arabic',       name: 'Arabic modern', head: "'Cairo',Tahoma,sans-serif", body: "'Cairo',Tahoma,sans-serif", css: 'arabic' },
+    { id: 'arabicserif',  name: 'Arabic classic', head: "'Amiri',Georgia,serif", body: "'Amiri',Georgia,serif", css: 'arabicserif' }
   ];
   function fontById(id) { return FONTS.find(f => f.id === id) || FONTS[0]; }
   // Font files are served from this site (assets/fonts), so visitors never connect to Google.
@@ -284,6 +329,31 @@
     return B;
   }
 
+  // Icons with text that visitors place anywhere on the page. Positions are in points from the top left,
+  // so they stay put whatever the design. They come last in the page, after the CV's own text.
+  const TONES = ['dark', 'light', 'accent'], SIZES = ['s', 'm', 'l'];
+  function badges(list, ed) {
+    const icons = global.InklineIcons;
+    if (!icons || !Array.isArray(list) || !list.length) return '';
+    const html = list.map((b, i) => {
+      const ic = icons.byId(b.icon);
+      if (!ic) return '';
+      const text = String(b.text || '');
+      if (!ed && !text.trim() && !ic.svg) return '';
+      // brand logos stay dark or white, as their owners ask; other icons may also take the design's colour
+      const tone = TONES.includes(b.tone) && !(ic.brand && b.tone === 'accent') ? b.tone : 'dark';
+      const size = SIZES.includes(b.size) ? b.size : 'm';
+      const handle = ed ? ` data-badge-drag="${i}" tabindex="0" role="button" aria-label="Move this ${esc(ic.name)} icon" title="Drag to move"` : '';
+      const mark = ic.svg ? `<span class="cv-badge-ic"${handle}>${ic.svg}</span>` : (ed ? `<span class="cv-badge-grip"${handle}></span>` : '');
+      const words = ed
+        ? `<span class="cv-badge-text" data-badge-text="${i}" contenteditable="true" spellcheck="true" data-ph="${esc(ic.ph)}">${esc(text)}</span>`
+        : (text.trim() ? `<span class="cv-badge-text">${esc(text)}</span>` : '');
+      const x = Math.max(0, Math.min(600, Number(b.x) || 0)), y = Math.max(0, Math.min(6000, Number(b.y) || 0));
+      return `<div class="cv-badge tone-${tone} size-${size}" style="left:${x.toFixed(1)}pt;top:${y.toFixed(1)}pt" data-badge="${i}">${mark}${words}</div>`;
+    }).join('');
+    return html ? `<div class="cv-badges">${html}</div>` : '';
+  }
+
   function templateById(id) {
     return TEMPLATES.find(t => t.id === id) || TEMPLATES.find(t => t.id === 'indigo');
   }
@@ -297,7 +367,7 @@
     const inner = t.layout === 'two'
       ? `${t.top.length ? `<div class="cv-top">${pick(t.top)}</div>` : ''}<div class="cv-grid"><div class="cv-main">${pick(t.main)}</div><aside class="cv-side">${pick(t.side)}</aside></div>`
       : pick(['head', 'profile', 'experience', 'education', 'skills', 'languages', 'extras']);
-    const accent = (ACCENTS.find(a => a.id === (opts.accent || t.accent)) || ACCENTS[0]).value;
+    const accent = accentValue(opts.accent || t.accent);
     const f = fontById(opts.font);
     const sz = opts.sizes || {};
     const scale = (v) => Math.min(1.4, Math.max(0.7, Number(v) || 1)).toFixed(2);
@@ -309,7 +379,7 @@
     const cls = ['cv', 'tpl-' + t.id, t.layout, opts.paper === 'letter' ? 'letter' : '', opts.editable ? 'editable' : '', opts.photo ? 'has-photo' : '', f.id !== 'default' ? 'custom-font' : '']
       .filter(Boolean).join(' ');
     const lang = langById(opts.sections && opts.sections.lang);
-    return `<div class="${cls}" style="${esc(style)}" lang="${lang.id}" dir="${lang.dir}">${inner}</div>`;
+    return `<div class="${cls}" style="${esc(style)}" lang="${lang.id}" dir="${lang.dir}">${inner}${badges(opts.badges, !!opts.editable)}</div>`;
   }
 
   // Read and write nested values by a dotted path like "experience.0.bullets.2".
@@ -374,8 +444,10 @@
     if (c.skills.length && show('skills')) lines.push(head('skills'), c.skills.join(', '), '');
     if (c.languages.length && show('languages')) lines.push(head('languages'), c.languages.join(', '), '');
     c.extras.forEach(g => { if (!g.items.length) return; lines.push(g.heading.toUpperCase()); g.items.forEach(i => lines.push('- ' + i)); lines.push(''); });
+    const icons = global.InklineIcons;
+    ((opts && opts.badges) || []).forEach(b => { const ic = icons && icons.byId(b.icon); if (ic && String(b.text || '').trim()) lines.push((ic.id === 'text' ? '' : ic.name + ': ') + b.text.trim()); });
     return lines.join('\n').trim();
   }
 
-  global.InklineCV = { TEMPLATES, ACCENTS, FONTS, LANGS, SECTION_KEYS, EXTRA_PRESETS, SAMPLE, ICONS, fontById, fontHref, langById, sectionTitle, dateWord, translateCV, emptyCV, render, normalize, getPath, setPath, plainText, templateById, esc };
+  global.InklineCV = { TEMPLATES, ACCENTS, FONTS, LANGS, readableAccent, accentValue, isHex, SECTION_KEYS, EXTRA_PRESETS, SAMPLE, ICONS, fontById, fontHref, langById, sectionTitle, dateWord, translateCV, emptyCV, render, normalize, getPath, setPath, plainText, templateById, esc };
 })(typeof window !== 'undefined' ? window : globalThis);
