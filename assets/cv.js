@@ -57,6 +57,52 @@
     return f.css ? `assets/fonts/${f.css}.css` : '';
   }
 
+  // Section headings and the small words on a CV, in the languages people most often need.
+  // Visitors can also type their own heading for any section, or their own word between dates.
+  const LANGS = [
+    { id: 'en', name: 'English',    dir: 'ltr', t: { contact: 'Contact', profile: 'Profile', experience: 'Experience', education: 'Education', skills: 'Skills', languages: 'Languages', more: 'More', to: 'to', present: 'Present' } },
+    { id: 'ar', name: 'العربية',    dir: 'rtl', t: { contact: 'التواصل', profile: 'نبذة عني', experience: 'الخبرة العملية', education: 'التعليم', skills: 'المهارات', languages: 'اللغات', more: 'المزيد', to: 'إلى', present: 'الآن' } },
+    { id: 'nl', name: 'Nederlands', dir: 'ltr', t: { contact: 'Contact', profile: 'Profiel', experience: 'Werkervaring', education: 'Opleiding', skills: 'Vaardigheden', languages: 'Talen', more: 'Overig', to: 'tot', present: 'heden' } },
+    { id: 'fr', name: 'Français',   dir: 'ltr', t: { contact: 'Contact', profile: 'Profil', experience: 'Expérience professionnelle', education: 'Formation', skills: 'Compétences', languages: 'Langues', more: 'Divers', to: 'à', present: "aujourd'hui" } },
+    { id: 'de', name: 'Deutsch',    dir: 'ltr', t: { contact: 'Kontakt', profile: 'Profil', experience: 'Berufserfahrung', education: 'Ausbildung', skills: 'Kenntnisse', languages: 'Sprachen', more: 'Sonstiges', to: 'bis', present: 'heute' } },
+    { id: 'es', name: 'Español',    dir: 'ltr', t: { contact: 'Contacto', profile: 'Perfil', experience: 'Experiencia', education: 'Formación', skills: 'Habilidades', languages: 'Idiomas', more: 'Otros', to: 'a', present: 'actualidad' } },
+    { id: 'pt', name: 'Português',  dir: 'ltr', t: { contact: 'Contacto', profile: 'Perfil', experience: 'Experiência', education: 'Formação', skills: 'Competências', languages: 'Idiomas', more: 'Outros', to: 'a', present: 'presente' } },
+    { id: 'it', name: 'Italiano',   dir: 'ltr', t: { contact: 'Contatti', profile: 'Profilo', experience: 'Esperienza', education: 'Istruzione', skills: 'Competenze', languages: 'Lingue', more: 'Altro', to: '–', present: 'oggi' } },
+    { id: 'tr', name: 'Türkçe',     dir: 'ltr', t: { contact: 'İletişim', profile: 'Profil', experience: 'Deneyim', education: 'Eğitim', skills: 'Beceriler', languages: 'Diller', more: 'Diğer', to: '–', present: 'günümüz' } }
+  ];
+  const SECTION_KEYS = ['contact', 'profile', 'experience', 'education', 'skills', 'languages'];
+  // Ready-made extra sections, named in each language.
+  const EXTRA_PRESETS = {
+    certifications: { en: 'Certifications', ar: 'الشهادات', nl: 'Certificaten', fr: 'Certifications', de: 'Zertifikate', es: 'Certificaciones', pt: 'Certificações', it: 'Certificazioni', tr: 'Sertifikalar' },
+    projects:       { en: 'Projects', ar: 'المشاريع', nl: 'Projecten', fr: 'Projets', de: 'Projekte', es: 'Proyectos', pt: 'Projetos', it: 'Progetti', tr: 'Projeler' },
+    volunteering:   { en: 'Volunteering', ar: 'العمل التطوعي', nl: 'Vrijwilligerswerk', fr: 'Bénévolat', de: 'Ehrenamt', es: 'Voluntariado', pt: 'Voluntariado', it: 'Volontariato', tr: 'Gönüllülük' },
+    awards:         { en: 'Awards', ar: 'الجوائز', nl: 'Prijzen', fr: 'Distinctions', de: 'Auszeichnungen', es: 'Premios', pt: 'Prémios', it: 'Premi', tr: 'Ödüller' },
+    courses:        { en: 'Courses', ar: 'الدورات التدريبية', nl: 'Cursussen', fr: 'Cours', de: 'Weiterbildung', es: 'Cursos', pt: 'Cursos', it: 'Corsi', tr: 'Kurslar' },
+    interests:      { en: 'Interests', ar: 'الاهتمامات', nl: 'Interesses', fr: "Centres d'intérêt", de: 'Interessen', es: 'Intereses', pt: 'Interesses', it: 'Interessi', tr: 'İlgi alanları' },
+    references:     { en: 'References', ar: 'المراجع', nl: 'Referenties', fr: 'Références', de: 'Referenzen', es: 'Referencias', pt: 'Referências', it: 'Referenze', tr: 'Referanslar' },
+    publications:   { en: 'Publications', ar: 'المنشورات', nl: 'Publicaties', fr: 'Publications', de: 'Publikationen', es: 'Publicaciones', pt: 'Publicações', it: 'Pubblicazioni', tr: 'Yayınlar' }
+  };
+  function langById(id) { return LANGS.find(l => l.id === id) || LANGS[0]; }
+  // What a section is called on this CV: the visitor's own words, or the chosen language's.
+  function sectionTitle(key, s) {
+    const own = s && s.titles && String(s.titles[key] || '').trim();
+    return own || langById(s && s.lang).t[key];
+  }
+  function dateWord(s) { return (s && String(s.to || '').trim()) || langById(s && s.lang).t.to; }
+  // After switching language: ready-made section names and "Present" follow into the new language.
+  function translateCV(cv, to) {
+    const same = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+    const now = langById(to).t.present;
+    (cv.extras || []).forEach(g => {
+      const preset = Object.values(EXTRA_PRESETS).find(p => Object.values(p).some(v => same(v, g.heading)));
+      if (preset) g.heading = preset[to] || preset.en;
+    });
+    ['experience', 'education'].forEach(list => (cv[list] || []).forEach(x => {
+      if (LANGS.some(l => same(l.t.present, x.end))) x.end = now;
+    }));
+    return cv;
+  }
+
   function emptyCV() {
     return {
       name: '', title: '', email: '', phone: '', location: '', link: '',
@@ -132,9 +178,9 @@
     return `<${tag}${klass.trim() ? ` class="${klass.trim()}"` : ''}${attrs}>${empty ? esc(placeholder || '') : esc(value)}</${tag}>`;
   }
 
-  function range(start, end) {
+  function range(start, end, to) {
     const a = String(start || '').trim(), b = String(end || '').trim();
-    if (a && b) return `${esc(a)} to ${esc(b)}`;
+    if (a && b) return `${esc(a)} ${esc(to || 'to')} ${esc(b)}`;
     return esc(a || b);
   }
   function org(a, b) {
@@ -150,15 +196,23 @@
   // The building blocks every template is assembled from.
   function blocks(c, opts, t) {
     const ed = !!opts.editable;
-    const contactSpans = () => ['email', 'phone', 'location', 'link']
+    const S = opts.sections || {};
+    const hidden = key => !!(S.hidden && S.hidden[key]);
+    // Section headings can be renamed by clicking them on the CV.
+    const h2 = key => ed
+      ? `<h2 data-heading="${key}" contenteditable="true" spellcheck="true" title="Click to rename this section">${esc(sectionTitle(key, S))}</h2>`
+      : `<h2>${esc(sectionTitle(key, S))}</h2>`;
+    const to = dateWord(S);
+    const contactSpans = () => hidden('contact') ? '' : ['email', 'phone', 'location', 'link']
       .map(k => (c[k] || ed) ? field('span', k, c[k], '', ed ? LABELS[k] : '', ed) : '')
       .filter(Boolean).join('');
     const nameTitle = () =>
       (field('h1', 'name', c.name, 'cv-name', 'Your name', ed) || '<h1 class="cv-name cv-empty">Your name</h1>') +
       field('p', 'title', c.title, 'cv-title', 'The job you want', ed);
+    // The word between dates ("to") can be changed by clicking it; it changes on every entry at once.
     const dates = (base, x) => ed
-      ? `${field('span', `${base}.start`, x.start, '', 'Start', ed)} to ${field('span', `${base}.end`, x.end, '', 'End', ed)}`
-      : range(x.start, x.end);
+      ? `${field('span', `${base}.start`, x.start, '', 'Start', ed)} <span class="cv-to" data-word="to" contenteditable="true" spellcheck="false" title="Click to change this word">${esc(to)}</span> ${field('span', `${base}.end`, x.end, '', 'End', ed)}`
+      : range(x.start, x.end, to);
 
     const B = {
       head() {
@@ -168,29 +222,30 @@
       },
       photo() {
         const act = ed ? ' data-action="photo" role="button" tabindex="0"' : '';
-        if (opts.photo) return `<div class="cv-photo"${act}${ed ? ' aria-label="Change your photo" title="Click to change your photo"' : ''}><img src="${esc(opts.photo)}" alt=""></div>`;
+        if (opts.photo) return `<div class="cv-photo"${act}${ed ? ' aria-label="Move, zoom or change your photo" title="Click to move, zoom or change your photo"' : ''}><img src="${esc(opts.photo)}" alt=""></div>`;
         if (ed) return `<div class="cv-photo cv-addphoto"${act} aria-label="Add your photo"><span>${ICONS.camera}Add photo</span></div>`;
         if (t.group === 'photo') return `<div class="cv-photo cv-mono" aria-hidden="true"><span>${esc(initials(c.name))}</span></div>`;
         return '';
       },
       contact() {
+        if (hidden('contact')) return '';
         const items = ['email', 'phone', 'location', 'link']
           .map(k => (c[k] || ed) ? `<li>${ICONS[k]}${field('span', k, c[k], '', LABELS[k], ed)}</li>` : '')
           .filter(Boolean).join('');
-        return items ? `<section class="cv-section cv-contact-sec"><h2>Contact</h2><ul class="cv-contact-list">${items}</ul></section>` : '';
+        return items ? `<section class="cv-section cv-contact-sec">${h2('contact')}<ul class="cv-contact-list">${items}</ul></section>` : '';
       },
       contactInline() {
         const cs = contactSpans();
         return cs ? `<p class="cv-contact">${cs}</p>` : '';
       },
       profile() {
-        return (c.summary || ed)
-          ? `<section class="cv-section"><h2>Profile</h2>${field('p', 'summary', c.summary, 'cv-summary', 'A short profile will appear here.', ed)}</section>`
+        return !hidden('profile') && (c.summary || ed)
+          ? `<section class="cv-section">${h2('profile')}${field('p', 'summary', c.summary, 'cv-summary', 'A short profile will appear here.', ed)}</section>`
           : '';
       },
       experience() {
-        if (!c.experience.length) return '';
-        return `<section class="cv-section cv-exp"><h2>Experience</h2>${c.experience.map((x, i) => `
+        if (!c.experience.length || hidden('experience')) return '';
+        return `<section class="cv-section cv-exp">${h2('experience')}${c.experience.map((x, i) => `
           <article class="cv-entry">
             <div class="cv-entry-top">${field('h3', `experience.${i}.role`, x.role, 'cv-role', 'Job title', ed)}<span class="cv-dates">${dates(`experience.${i}`, x)}</span></div>
             ${org(field('span', `experience.${i}.company`, x.company, '', 'Company', ed), field('span', `experience.${i}.location`, x.location, '', 'City', ed))}
@@ -198,8 +253,8 @@
           </article>`).join('')}</section>`;
       },
       education() {
-        if (!c.education.length) return '';
-        return `<section class="cv-section cv-edu"><h2>Education</h2>${c.education.map((x, i) => `
+        if (!c.education.length || hidden('education')) return '';
+        return `<section class="cv-section cv-edu">${h2('education')}${c.education.map((x, i) => `
           <article class="cv-entry">
             <div class="cv-entry-top">${field('h3', `education.${i}.qualification`, x.qualification, 'cv-role', 'Qualification', ed)}<span class="cv-dates">${dates(`education.${i}`, x)}</span></div>
             ${org(field('span', `education.${i}.school`, x.school, '', 'School', ed), field('span', `education.${i}.location`, x.location, '', 'City', ed))}
@@ -207,19 +262,23 @@
           </article>`).join('')}</section>`;
       },
       skills() {
-        return c.skills.length
-          ? `<section class="cv-section"><h2>Skills</h2><ul class="cv-tags">${c.skills.map((s, i) => field('li', `skills.${i}`, s, '', 'Skill', ed)).join('')}</ul></section>`
+        return c.skills.length && !hidden('skills')
+          ? `<section class="cv-section">${h2('skills')}<ul class="cv-tags">${c.skills.map((s, i) => field('li', `skills.${i}`, s, '', 'Skill', ed)).join('')}</ul></section>`
           : '';
       },
       languages() {
-        return c.languages.length
-          ? `<section class="cv-section"><h2>Languages</h2><ul class="cv-tags">${c.languages.map((s, i) => field('li', `languages.${i}`, s, '', 'Language', ed)).join('')}</ul></section>`
+        return c.languages.length && !hidden('languages')
+          ? `<section class="cv-section">${h2('languages')}<ul class="cv-tags">${c.languages.map((s, i) => field('li', `languages.${i}`, s, '', 'Language', ed)).join('')}</ul></section>`
           : '';
       },
       extras() {
-        return (c.extras || []).map((g, i) => (g && (g.items || []).length)
-          ? `<section class="cv-section">${field('h2', `extras.${i}.heading`, g.heading, '', 'Section', ed) || '<h2>More</h2>'}<ul class="cv-bullets">${g.items.map((s, j) => field('li', `extras.${i}.items.${j}`, s, '', 'Item', ed)).join('')}</ul></section>`
-          : '').join('');
+        // While editing, a new section shows straight away with a line to type in.
+        return (c.extras || []).map((g, i) => {
+          if (!g) return '';
+          const items = (g.items || []).length ? g.items : (ed ? [''] : []);
+          if (!items.length) return '';
+          return `<section class="cv-section cv-extra">${field('h2', `extras.${i}.heading`, g.heading, '', 'Section name', ed) || `<h2>${esc(langById(S.lang).t.more)}</h2>`}<ul class="cv-bullets">${items.map((s, j) => field('li', `extras.${i}.items.${j}`, s, '', 'Type here, then press Enter for the next line', ed)).join('')}</ul></section>`;
+        }).join('');
       }
     };
     return B;
@@ -249,7 +308,8 @@
     if (sz.text && +sz.text !== 1) style += `;--cv-text-scale:${scale(sz.text)}`;
     const cls = ['cv', 'tpl-' + t.id, t.layout, opts.paper === 'letter' ? 'letter' : '', opts.editable ? 'editable' : '', opts.photo ? 'has-photo' : '', f.id !== 'default' ? 'custom-font' : '']
       .filter(Boolean).join(' ');
-    return `<div class="${cls}" style="${esc(style)}" lang="${esc(opts.lang || 'en')}">${inner}</div>`;
+    const lang = langById(opts.sections && opts.sections.lang);
+    return `<div class="${cls}" style="${esc(style)}" lang="${lang.id}" dir="${lang.dir}">${inner}</div>`;
   }
 
   // Read and write nested values by a dotted path like "experience.0.bullets.2".
@@ -289,31 +349,33 @@
     return c;
   }
 
-  function plainText(cv) {
-    const c = normalize(cv);
-    const lines = [c.name, c.title, [c.email, c.phone, c.location, c.link].filter(Boolean).join(' | '), ''];
-    if (c.summary) lines.push('PROFILE', c.summary, '');
-    if (c.experience.length) {
-      lines.push('EXPERIENCE');
+  function plainText(cv, opts) {
+    const c = normalize(cv), S = (opts && opts.sections) || {};
+    const show = key => !(S.hidden && S.hidden[key]), head = key => sectionTitle(key, S).toLocaleUpperCase(langById(S.lang).id);
+    const to = ' ' + dateWord(S) + ' ';
+    const lines = [c.name, c.title, show('contact') ? [c.email, c.phone, c.location, c.link].filter(Boolean).join(' | ') : '', ''];
+    if (c.summary && show('profile')) lines.push(head('profile'), c.summary, '');
+    if (c.experience.length && show('experience')) {
+      lines.push(head('experience'));
       c.experience.forEach(x => {
-        lines.push(`${x.role}, ${x.company}${x.location ? ', ' + x.location : ''} (${[x.start, x.end].filter(Boolean).join(' to ')})`);
+        lines.push(`${x.role}, ${x.company}${x.location ? ', ' + x.location : ''} (${[x.start, x.end].filter(Boolean).join(to)})`);
         x.bullets.forEach(b => lines.push('- ' + b));
         lines.push('');
       });
     }
-    if (c.education.length) {
-      lines.push('EDUCATION');
+    if (c.education.length && show('education')) {
+      lines.push(head('education'));
       c.education.forEach(x => {
-        lines.push(`${x.qualification}, ${x.school}${x.location ? ', ' + x.location : ''} (${[x.start, x.end].filter(Boolean).join(' to ')})`);
+        lines.push(`${x.qualification}, ${x.school}${x.location ? ', ' + x.location : ''} (${[x.start, x.end].filter(Boolean).join(to)})`);
         if (x.details) lines.push(x.details);
       });
       lines.push('');
     }
-    if (c.skills.length) lines.push('SKILLS', c.skills.join(', '), '');
-    if (c.languages.length) lines.push('LANGUAGES', c.languages.join(', '), '');
+    if (c.skills.length && show('skills')) lines.push(head('skills'), c.skills.join(', '), '');
+    if (c.languages.length && show('languages')) lines.push(head('languages'), c.languages.join(', '), '');
     c.extras.forEach(g => { if (!g.items.length) return; lines.push(g.heading.toUpperCase()); g.items.forEach(i => lines.push('- ' + i)); lines.push(''); });
     return lines.join('\n').trim();
   }
 
-  global.InklineCV = { TEMPLATES, ACCENTS, FONTS, SAMPLE, ICONS, fontById, fontHref, emptyCV, render, normalize, getPath, setPath, plainText, templateById, esc };
+  global.InklineCV = { TEMPLATES, ACCENTS, FONTS, LANGS, SECTION_KEYS, EXTRA_PRESETS, SAMPLE, ICONS, fontById, fontHref, langById, sectionTitle, dateWord, translateCV, emptyCV, render, normalize, getPath, setPath, plainText, templateById, esc };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -2,7 +2,7 @@
    in a form yourself. Both edit the same CV, shown live in any design, with an optional photo. */
 (function () {
   'use strict';
-  const { TEMPLATES, ACCENTS, FONTS, SAMPLE, ICONS, fontById, fontHref, emptyCV, render, normalize, setPath, plainText, templateById, esc } = window.InklineCV;
+  const { TEMPLATES, ACCENTS, FONTS, LANGS, SECTION_KEYS, EXTRA_PRESETS, SAMPLE, ICONS, fontById, fontHref, langById, sectionTitle, dateWord, translateCV, emptyCV, render, normalize, setPath, plainText, templateById, esc } = window.InklineCV;
   const $ = s => document.querySelector(s);
   const app = $('.app'), log = $('#log'), quick = $('#quick'), answer = $('#answer'), sendBtn = $('#send');
   const sheet = $('#sheet'), frame = $('#frame'), desk = $('#desk'), formEl = $('#form');
@@ -22,7 +22,10 @@
   function fresh() {
     return {
       v: 1, cv: emptyCV(), template: 'atlas', accent: 'navy', paper: 'a4', photo: '',
+      photoSrc: '',          // the whole photo (made smaller), kept so it can be cropped again
+      photoCrop: null,       // where the crop sits in it: centre x, centre y (0 to 1) and zoom
       font: 'default', sizes: { name: 1, head: 1, text: 1 },
+      sections: cleanSections(),   // heading language, renamed or hidden sections, the word between dates
       started: false,
       pane: 'chat',          // 'chat' or 'form'
       mode: null,            // in the chat: 'ai' or 'guided'
@@ -42,6 +45,9 @@
         if (templateById(s.template).id !== s.template) s.template = 'atlas';
         if (!ACCENTS.some(a => a.id === s.accent)) s.accent = templateById(s.template).accent;
         if (!safePhoto(s.photo)) s.photo = '';
+        if (!safePhoto(s.photoSrc) || !s.photo) s.photoSrc = '';
+        s.photoCrop = cleanCrop(s.photoCrop);
+        s.sections = cleanSections(s.sections);
         delete s.history;   // older versions kept the chat history in the browser
         if (typeof s.conversation !== 'string') s.conversation = null;
         if (s.started === undefined) s.started = !!(s.chat && s.chat.length);
@@ -52,6 +58,22 @@
       }
     } catch (e) { /* storage unavailable: start fresh */ }
     return null;
+  }
+  // Settings read back from storage are checked, so nothing odd can reach the page.
+  function cleanSections(x) {
+    x = x && typeof x === 'object' ? x : {};
+    const str = (v, n) => typeof v === 'string' ? v.slice(0, n) : '';
+    const titles = {}, hidden = {};
+    SECTION_KEYS.forEach(k => {
+      if (x.titles && str(x.titles[k], 60).trim()) titles[k] = str(x.titles[k], 60);
+      if (x.hidden && x.hidden[k] === true) hidden[k] = true;
+    });
+    return { lang: langById(x.lang).id, titles, hidden, to: str(x.to, 20) };
+  }
+  function cleanCrop(c) {
+    if (!c || typeof c !== 'object') return null;
+    const n = (v, lo, hi) => Math.min(hi, Math.max(lo, Number(v) || 0));
+    return { x: n(c.x, 0, 1), y: n(c.y, 0, 1), z: n(c.z, 1, 6) };
   }
   let warnedStorage = false;
   function save() {
@@ -74,7 +96,7 @@
   // ---------- preview ----------
   let renderedHTML = '';
   function opts(extra) {
-    return Object.assign({ template: state.template, accent: state.accent, paper: state.paper, photo: state.photo, font: state.font, sizes: state.sizes }, extra || {});
+    return Object.assign({ template: state.template, accent: state.accent, paper: state.paper, photo: state.photo, font: state.font, sizes: state.sizes, sections: state.sections }, extra || {});
   }
   function renderCV(flash) {
     const html = render(state.cv, opts({ editable: true }));
@@ -89,6 +111,11 @@
     syncDesignButton();
   }
   let renderT = null;
+  // Scroll the CV area (not the whole page) so an element sits in the middle of it.
+  function revealOnCV(el) {
+    const d = desk.getBoundingClientRect(), r = el.getBoundingClientRect();
+    desk.scrollTo({ top: desk.scrollTop + r.top - d.top - d.height / 2 + r.height / 2, behavior: 'smooth' });
+  }
   function renderSoon() { clearTimeout(renderT); renderT = setTimeout(() => renderCV(false), 120); }
   function fit() {
     const cv = sheet.firstElementChild;
@@ -117,6 +144,25 @@
     if (el && el.classList.contains('cv-empty')) { el.textContent = ''; el.classList.remove('cv-empty'); }
   });
   sheet.addEventListener('input', e => {
+    const hd = e.target.closest('[data-heading]'), word = e.target.closest('[data-word]');
+    if (hd || word) {
+      const text = (hd || word).textContent.replace(/\s+/g, ' ').trim();
+      if (hd) {
+        const key = hd.dataset.heading;
+        // typing the language's own word again simply goes back to it
+        if (!text || text === langById(state.sections.lang).t[key]) delete state.sections.titles[key];
+        else state.sections.titles[key] = text.slice(0, 60);
+        document.querySelectorAll(`[data-sec-title="${key}"]`).forEach(x => { x.value = state.sections.titles[key] || ''; });
+      } else {
+        state.sections.to = text === langById(state.sections.lang).t.to ? '' : text.slice(0, 20);
+        // every entry uses the same word, so the others change as you type
+        sheet.querySelectorAll('[data-word="to"]').forEach(x => { if (x !== word) x.textContent = dateWord(state.sections); });
+        document.querySelectorAll('[data-sec-to]').forEach(x => { x.value = state.sections.to; });
+        document.querySelectorAll('[data-sec-example]').forEach(x => { x.textContent = dateExample(); });
+      }
+      save();
+      return;
+    }
     const el = e.target.closest('[data-path]');
     if (!el) return;
     setPath(state.cv, el.dataset.path, el.textContent.replace(/\s+/g, ' ').trim());
@@ -124,71 +170,208 @@
     save();
     countPages();
   });
+  // Empty lines are tidied away only once the visitor leaves the CV, so the lines still being edited keep their places.
+  let addingLine = false;
   sheet.addEventListener('focusout', e => {
-    if (!e.target.closest('[data-path]')) return;
-    state.cv = normalize(state.cv);
-    save();
+    if (addingLine || !e.target.closest('[data-path],[data-heading],[data-word]')) return;
     setTimeout(() => {
       if (sheet.contains(document.activeElement)) return;
+      state.cv = normalize(state.cv);
+      save();
       renderCV(false);
       if (state.pane === 'form') buildForm();
+      if (!sectionsPanel.hidden) refreshSectionsPanel();
     }, 0);
   });
   sheet.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && e.target.closest('[data-path]')) { e.preventDefault(); e.target.blur(); }
-    if ((e.key === 'Enter' || e.key === ' ') && e.target.closest('[data-action="photo"]')) { e.preventDefault(); pickPhoto(); }
+    // Enter in a list (bullet points, or the lines of an added section) starts a new line below
+    const li = e.target.closest('[data-path]');
+    const m = li && e.key === 'Enter' && !e.shiftKey && li.dataset.path.match(/^((?:experience|extras)\.\d+\.(?:bullets|items))\.(\d+)$/);
+    if (m && li.textContent.trim()) {
+      e.preventDefault();
+      const list = m[1].split('.').reduce((o, k) => o[k], state.cv), at = +m[2] + 1;
+      setPath(state.cv, li.dataset.path, li.textContent.replace(/\s+/g, ' ').trim());
+      list.splice(at, 0, '');
+      addingLine = true;
+      renderedHTML = '';
+      renderCV(false);
+      const next = sheet.querySelector(`[data-path="${m[1]}.${at}"]`);
+      if (next) next.focus();
+      addingLine = false;
+      save();
+      return;
+    }
+    if (e.key === 'Enter' && e.target.closest('[data-path],[data-heading],[data-word]')) { e.preventDefault(); e.target.blur(); }
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.closest('[data-action="photo"]')) { e.preventDefault(); photoClicked(); }
   });
-  sheet.addEventListener('click', e => { if (e.target.closest('[data-action="photo"]')) pickPhoto(); });
+  sheet.addEventListener('click', e => { if (e.target.closest('[data-action="photo"]')) photoClicked(); });
   sheet.addEventListener('paste', e => {
-    if (!e.target.closest('[data-path]')) return;
+    if (!e.target.closest('[data-path],[data-heading],[data-word]')) return;
     e.preventDefault();
     const text = (e.clipboardData || window.clipboardData).getData('text');
     document.execCommand('insertText', false, text.replace(/\s+/g, ' '));
   });
 
   // ---------- photo ----------
+  // A new photo opens the crop window; clicking the photo on the CV opens it again to move or zoom.
   const photoInput = $('#photo-input');
   function pickPhoto() { photoInput.value = ''; photoInput.click(); }
+  function photoClicked() { if (state.photo) openCropper(state.photoSrc || state.photo, state.photoSrc ? state.photoCrop : null, false); else pickPhoto(); }
   photoInput.addEventListener('change', () => { if (photoInput.files && photoInput.files[0]) usePhoto(photoInput.files[0]); });
   function usePhoto(file) {
     if (!/^image\//.test(file.type)) { toast('Please choose a photo, like a JPG or PNG.'); return; }
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
-      // Square crop. For portrait photos keep the upper part, where the face usually is.
-      const w = img.naturalWidth, h = img.naturalHeight, s = Math.min(w, h);
-      const sx = (w - s) / 2;
-      const sy = h > w ? Math.min((h - s) * 0.18, h - s) : 0;
-      const size = Math.min(720, s);
+      // kept at a sensible size, so it can be cropped again later without filling up the browser's storage
+      const k = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight));
       const c = document.createElement('canvas');
-      c.width = c.height = size;
+      c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
       const ctx = c.getContext('2d');
       ctx.imageSmoothingQuality = 'high';
-      ctx.drawImage(img, sx, sy, s, s, 0, 0, size, size);
+      ctx.drawImage(img, 0, 0, c.width, c.height);
       URL.revokeObjectURL(url);
-      const photo = c.toDataURL('image/jpeg', 0.86);
-      if (!safePhoto(photo)) { toast("That photo couldn't be used. Try another one."); return; }
-      state.photo = photo;
-      save();
-      renderCV(true);
-      syncPhotoUI();
-      if (state.pane === 'form') buildForm();
-      if (!templateById(state.template).photo) toast('Photo added. It shows in designs with a photo spot, like Atlas, Vertex or Bloom.');
-      else toast('Photo added. It stays in your browser and is never sent to the AI.');
+      const src = c.toDataURL('image/jpeg', 0.88);
+      if (!safePhoto(src)) { toast("That photo couldn't be used. Try another one."); return; }
+      openCropper(src, null, true);
     };
     img.onerror = () => { URL.revokeObjectURL(url); toast("That photo couldn't be opened. Try a JPG or PNG."); };
     img.src = url;
   }
   function removePhoto() {
-    state.photo = '';
+    state.photo = ''; state.photoSrc = ''; state.photoCrop = null;
     save(); renderCV(false); syncPhotoUI();
     if (state.pane === 'form') buildForm();
   }
   function syncPhotoUI() {
     $('#photo-mini').innerHTML = safePhoto(state.photo) ? `<img src="${state.photo}" alt="">` : ICONS.camera;
-    $('#photo-label').textContent = state.photo ? 'Change photo' : 'Add photo';
+    $('#photo-label').textContent = state.photo ? 'Edit photo' : 'Add photo';
   }
-  $('#photo-btn').addEventListener('click', pickPhoto);
+  $('#photo-btn').addEventListener('click', photoClicked);
+
+  // ---------- cropping the photo ----------
+  const cropper = $('#cropper'), cropStage = $('#crop-stage'), cropImg = $('#crop-img'), cropZoom = $('#crop-zoom');
+  const crop = { img: null, src: '', w: 0, h: 0, S: 0, base: 1, z: 1, ox: 0, oy: 0, isNew: false, pointers: new Map(), pinch: null, back: null };
+  function openCropper(src, start, isNew) {
+    const img = new Image();
+    img.onload = () => {
+      Object.assign(crop, { img, src, w: img.naturalWidth, h: img.naturalHeight, isNew });
+      crop.back = document.activeElement;
+      cropImg.src = src;
+      // the frame matches the design: a portrait rectangle for Noir, a circle for the others
+      $('#crop-mask').className = 'crop-mask ' + (state.template === 'noir' ? 'rect' : 'round');
+      $('#crop-remove').hidden = isNew;
+      cropper.hidden = false;
+      placeCrop(start || startingCrop());
+      cropStage.focus({ preventScroll: true });
+    };
+    img.onerror = () => toast("That photo couldn't be opened. Try a JPG or PNG.");
+    img.src = src;
+  }
+  // where a new photo starts: the middle, and the upper part of a tall photo, where the face usually is
+  function startingCrop() {
+    const s = Math.min(crop.w, crop.h), sy = crop.h > crop.w ? Math.min((crop.h - s) * 0.18, crop.h - s) : 0;
+    return { x: 0.5, y: (sy + s / 2) / crop.h, z: 1 };
+  }
+  function placeCrop(c) {
+    crop.S = cropStage.clientWidth;
+    crop.base = Math.max(crop.S / crop.w, crop.S / crop.h);
+    crop.z = c.z;
+    const k = crop.base * crop.z;
+    crop.ox = crop.S / 2 - c.x * crop.w * k;
+    crop.oy = crop.S / 2 - c.y * crop.h * k;
+    drawCrop();
+  }
+  function drawCrop() {
+    const k = crop.base * crop.z;
+    crop.ox = Math.min(0, Math.max(crop.S - crop.w * k, crop.ox));
+    crop.oy = Math.min(0, Math.max(crop.S - crop.h * k, crop.oy));
+    cropImg.style.width = crop.w * k + 'px';
+    cropImg.style.height = crop.h * k + 'px';
+    cropImg.style.transform = `translate(${crop.ox}px,${crop.oy}px)`;
+    cropZoom.value = crop.z;
+  }
+  function zoomCropAt(z, px, py) {
+    z = Math.min(4, Math.max(1, z));
+    const r = z / crop.z;
+    crop.ox = px - (px - crop.ox) * r;
+    crop.oy = py - (py - crop.oy) * r;
+    crop.z = z;
+    drawCrop();
+  }
+  function currentCrop() {
+    const k = crop.base * crop.z;
+    return { x: (crop.S / 2 - crop.ox) / (crop.w * k), y: (crop.S / 2 - crop.oy) / (crop.h * k), z: crop.z };
+  }
+  function pinchInfo() {
+    const [a, b] = [...crop.pointers.values()], r = cropStage.getBoundingClientRect();
+    return { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, mx: (a.x + b.x) / 2 - r.left, my: (a.y + b.y) / 2 - r.top, z: crop.z };
+  }
+  cropStage.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    cropStage.setPointerCapture(e.pointerId);
+    crop.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    crop.pinch = crop.pointers.size === 2 ? pinchInfo() : null;
+  });
+  cropStage.addEventListener('pointermove', e => {
+    const p = crop.pointers.get(e.pointerId);
+    if (!p) return;
+    if (crop.pointers.size === 1) { crop.ox += e.clientX - p.x; crop.oy += e.clientY - p.y; drawCrop(); }
+    p.x = e.clientX; p.y = e.clientY;
+    if (crop.pointers.size === 2 && crop.pinch) { const now = pinchInfo(); zoomCropAt(crop.pinch.z * now.d / crop.pinch.d, now.mx, now.my); }
+  });
+  const endPointer = e => { crop.pointers.delete(e.pointerId); crop.pinch = crop.pointers.size === 2 ? pinchInfo() : null; };
+  cropStage.addEventListener('pointerup', endPointer);
+  cropStage.addEventListener('pointercancel', endPointer);
+  cropStage.addEventListener('wheel', e => {
+    e.preventDefault();
+    const r = cropStage.getBoundingClientRect();
+    zoomCropAt(crop.z * Math.exp(-e.deltaY * 0.0015), e.clientX - r.left, e.clientY - r.top);
+  }, { passive: false });
+  cropStage.addEventListener('keydown', e => {
+    const step = e.shiftKey ? 30 : 8, mid = crop.S / 2;
+    if (e.key === 'ArrowLeft') crop.ox += step; else if (e.key === 'ArrowRight') crop.ox -= step;
+    else if (e.key === 'ArrowUp') crop.oy += step; else if (e.key === 'ArrowDown') crop.oy -= step;
+    else if (e.key === '+' || e.key === '=') return zoomCropAt(crop.z * 1.1, mid, mid);
+    else if (e.key === '-' || e.key === '_') return zoomCropAt(crop.z / 1.1, mid, mid);
+    else return;
+    e.preventDefault();
+    drawCrop();
+  });
+  cropZoom.addEventListener('input', () => zoomCropAt(+cropZoom.value, crop.S / 2, crop.S / 2));
+  addEventListener('resize', () => { if (!cropper.hidden) placeCrop(currentCrop()); });
+  function closeCropper() {
+    cropper.hidden = true;
+    crop.pointers.clear();
+    if (crop.back && crop.back.focus) crop.back.focus({ preventScroll: true });
+  }
+  $('#crop-cancel').addEventListener('click', closeCropper);
+  $('#crop-change').addEventListener('click', () => { closeCropper(); pickPhoto(); });
+  $('#crop-remove').addEventListener('click', () => { closeCropper(); removePhoto(); });
+  addEventListener('keydown', e => { if (e.key === 'Escape' && !cropper.hidden) closeCropper(); });
+  $('#crop-done').addEventListener('click', () => {
+    // the visible square becomes the photo (up to 720 pixels), drawn by us, so it is always a plain JPEG
+    const c = currentCrop(), side = crop.S / (crop.base * crop.z);
+    const out = Math.round(Math.max(240, Math.min(720, side)));
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = out;
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(crop.img, c.x * crop.w - side / 2, c.y * crop.h - side / 2, side, side, 0, 0, out, out);
+    const photo = canvas.toDataURL('image/jpeg', 0.86);
+    if (!safePhoto(photo)) { toast("That photo couldn't be used. Try another one."); return; }
+    const wasNew = crop.isNew;
+    state.photo = photo;
+    state.photoSrc = safePhoto(crop.src) ? crop.src : '';
+    state.photoCrop = c;
+    save();
+    closeCropper();
+    renderCV(true);
+    syncPhotoUI();
+    if (state.pane === 'form') buildForm();
+    if (!templateById(state.template).photo) toast('Photo added. It shows in designs with a photo spot, like Atlas, Vertex or Bloom.');
+    else toast(wasNew ? 'Photo added. Click it on your CV any time to move or zoom it.' : 'Photo updated.');
+  });
 
   // ---------- toolbar ----------
   function buildToolbar() {
@@ -236,7 +419,7 @@
     const group = (key, title, text) => `
       <section class="picker-group"><h3>${title}</h3><p>${text}</p><div class="tgrid">${TEMPLATES.filter(t => t.group === key).map(t => `
         <button type="button" class="tpick" data-tpl="${t.id}" aria-pressed="${t.id === state.template}">
-          <span class="t-mini" aria-hidden="true">${render(cv, { template: t.id, accent: t.accent, paper: state.paper, photo: previewPhoto(), font: state.font, sizes: state.sizes })}</span>
+          <span class="t-mini" aria-hidden="true">${render(cv, { template: t.id, accent: t.accent, paper: state.paper, photo: previewPhoto(), font: state.font, sizes: state.sizes, sections: state.sections })}</span>
           <b>${esc(t.name)}</b><span>${esc(t.note)}</span>
         </button>`).join('')}</div></section>`;
     body.innerHTML =
@@ -285,7 +468,7 @@
   });
   $('#copy').addEventListener('click', async () => {
     const b = $('#copy');
-    try { await navigator.clipboard.writeText(plainText(state.cv)); b.textContent = 'Copied'; }
+    try { await navigator.clipboard.writeText(plainText(state.cv, opts())); b.textContent = 'Copied'; }
     catch (e) { b.textContent = 'Copy failed'; }
     setTimeout(() => { b.textContent = 'Copy as text'; }, 1800);
   });
@@ -293,7 +476,7 @@
     if (!confirm('Start a new CV? This deletes your CV, photo and chat from this browser, and the chat from our server.')) return;
     if (state.conversation) api({ action: 'end', conversation: state.conversation });
     try { localStorage.removeItem(STORE); } catch (e) { /* nothing stored */ }
-    const keep = { template: state.template, accent: state.accent, paper: state.paper, font: state.font, sizes: state.sizes };
+    const keep = { template: state.template, accent: state.accent, paper: state.paper, font: state.font, sizes: state.sizes, sections: state.sections };
     state = Object.assign(fresh(), keep);
     log.innerHTML = ''; renderedHTML = ''; chatPromise = null;
     setQuick([]);
@@ -395,6 +578,7 @@
   });
   const textPanel = $('#text-panel');
   function openTextPanel() {
+    if (typeof closeSectionsPanel === 'function' && !sectionsPanel.hidden) closeSectionsPanel();
     FONTS.forEach(f => ensureFont(f.id));   // so every option previews in its own font
     $('#text-panel-body').innerHTML = textControls('tp');
     textPanel.hidden = false;
@@ -409,6 +593,135 @@
   addEventListener('keydown', e => { if (e.key === 'Escape' && !textPanel.hidden) closeTextPanel(); });
   document.addEventListener('pointerdown', e => {
     if (!textPanel.hidden && !textPanel.contains(e.target) && !e.target.closest('#text-btn')) closeTextPanel();
+  });
+
+  // ---------- sections and headings ----------
+  // Every design keeps its layout; visitors choose which sections show, what they are called
+  // (in any language), the word between dates, and add sections of their own.
+  const SECTION_NAMES = { contact: 'Contact details', profile: 'Profile', experience: 'Experience', education: 'Education', skills: 'Skills', languages: 'Languages' };
+  const dateExample = () => `2021 ${dateWord(state.sections)} ${langById(state.sections.lang).t.present}`;
+  function sectionControls(prefix, withExtras) {
+    const S = state.sections, L = langById(S.lang), c = state.cv;
+    return `
+      <div class="sc-lang"><label for="${prefix}-lang">Heading language</label>
+        <select class="f-in sc-select" id="${prefix}-lang" data-sec-lang>${LANGS.map(l => `<option value="${l.id}"${l.id === S.lang ? ' selected' : ''}>${esc(l.name)}</option>`).join('')}</select></div>
+      <p class="sc-hint">Untick a section to hide it. To rename one, type a new name here or click its heading on your CV.</p>
+      <ul class="sc-list">${SECTION_KEYS.map(k => `
+        <li class="${S.hidden[k] ? 'off' : ''}">
+          <input type="checkbox" class="sc-check" id="${prefix}-show-${k}" data-sec-show="${k}"${S.hidden[k] ? '' : ' checked'}>
+          <label class="sr-only" for="${prefix}-show-${k}">Show ${SECTION_NAMES[k]}</label>
+          <input class="f-in" data-sec-title="${k}" value="${esc(S.titles[k] || '')}" placeholder="${esc(L.t[k])}" aria-label="Heading for ${SECTION_NAMES[k]}" dir="auto" maxlength="60">
+        </li>`).join('')}
+      </ul>
+      <div class="sc-to"><label for="${prefix}-to">Word between dates</label>
+        <input class="f-in" id="${prefix}-to" data-sec-to value="${esc(S.to)}" placeholder="${esc(L.t.to)}" dir="auto" maxlength="20">
+        <span class="sc-example" data-sec-example>${esc(dateExample())}</span></div>
+      ${withExtras ? `
+      <h3 class="sc-sub">Sections you added</h3>
+      ${c.extras.length ? `<ul class="sc-list">${c.extras.map((g, i) => `
+        <li><span class="sc-dot" aria-hidden="true"></span>
+          <input class="f-in" data-extra-title="${i}" value="${esc(g.heading)}" placeholder="${esc(L.t.more)}" aria-label="Name of added section ${i + 1}" dir="auto" maxlength="80">
+          <button type="button" class="small-btn" data-extra-del="${i}">Remove</button></li>`).join('')}</ul>` : '<p class="sc-hint">None yet. Add one below.</p>'}
+      ${extraChips('data-extra-add')}` : ''}`;
+  }
+  // Ready-made sections, named in the CV's language, that aren't on the CV yet.
+  function extraChips(attr) {
+    if (state.cv.extras.length >= 8) return '<p class="sc-hint">You can have up to 8 added sections.</p>';
+    const lang = state.sections.lang, have = state.cv.extras.map(g => g.heading.trim().toLowerCase());
+    return `<div class="suggest">${Object.values(EXTRA_PRESETS).map(p => p[lang] || p.en).filter(h => !have.includes(h.toLowerCase()))
+      .map(h => `<button type="button" class="chip" ${attr}="${esc(h)}">+ ${esc(h)}</button>`).join('')}<button type="button" class="chip" ${attr}="">+ Your own section</button></div>`;
+  }
+  const sectionsPanel = $('#sections-panel');
+  function refreshSectionsPanel() { $('#sections-panel-body').innerHTML = sectionControls('sp', true); }
+  function openSectionsPanel() {
+    closeTextPanel();
+    refreshSectionsPanel();
+    sectionsPanel.hidden = false;
+    $('#sections-btn').setAttribute('aria-expanded', 'true');
+  }
+  function closeSectionsPanel() {
+    sectionsPanel.hidden = true;
+    $('#sections-btn').setAttribute('aria-expanded', 'false');
+  }
+  $('#sections-btn').addEventListener('click', () => { if (sectionsPanel.hidden) openSectionsPanel(); else closeSectionsPanel(); });
+  $('#sections-close').addEventListener('click', closeSectionsPanel);
+  addEventListener('keydown', e => { if (e.key === 'Escape' && !sectionsPanel.hidden) closeSectionsPanel(); });
+  document.addEventListener('pointerdown', e => {
+    if (!sectionsPanel.hidden && !sectionsPanel.contains(e.target) && !e.target.closest('#sections-btn')) closeSectionsPanel();
+  });
+  function afterSectionChange(rebuild) {
+    save();
+    renderCV(false);
+    if (rebuild) {
+      if (state.pane === 'form') buildForm();
+      if (!sectionsPanel.hidden) refreshSectionsPanel();
+    }
+  }
+  // the same box can be open in the toolbar panel and the form at once: keep them in step
+  function syncSectionInputs(src) {
+    const attr = ['data-sec-title', 'data-sec-to', 'data-extra-title'].find(a => src.hasAttribute(a));
+    document.querySelectorAll(`[${attr}="${src.getAttribute(attr)}"]`).forEach(x => { if (x !== src) x.value = src.value; });
+    document.querySelectorAll('[data-sec-example]').forEach(x => { x.textContent = dateExample(); });
+  }
+  document.addEventListener('change', e => {
+    const t = e.target;
+    if (t.matches('[data-sec-lang]')) {
+      const lang = langById(t.value).id;
+      // a new language replaces typed headings; ready-made section names and "Present" are translated
+      state.sections = { lang, titles: {}, hidden: state.sections.hidden, to: '' };
+      translateCV(state.cv, lang);
+      afterSectionChange(true);
+      toast(`Headings are now in ${langById(lang).name}. You can still rename any of them.`);
+    } else if (t.matches('[data-sec-show]')) {
+      const k = t.dataset.secShow;
+      if (t.checked) delete state.sections.hidden[k]; else state.sections.hidden[k] = true;
+      document.querySelectorAll(`[data-sec-show="${k}"]`).forEach(x => { x.checked = t.checked; x.closest('li').classList.toggle('off', !t.checked); });
+      afterSectionChange(false);
+    }
+  });
+  document.addEventListener('input', e => {
+    const t = e.target;
+    if (t.matches('[data-sec-title]')) {
+      const k = t.dataset.secTitle;
+      if (t.value.trim()) state.sections.titles[k] = t.value.slice(0, 60); else delete state.sections.titles[k];
+    } else if (t.matches('[data-sec-to]')) {
+      state.sections.to = t.value.slice(0, 20);
+    } else if (t.matches('[data-extra-title]')) {
+      const g = state.cv.extras[+t.dataset.extraTitle];
+      if (!g) return;
+      g.heading = t.value.slice(0, 80);
+      state.edited = true;
+    } else return;
+    syncSectionInputs(t);
+    save();
+    renderSoon();
+  });
+  document.addEventListener('click', e => {
+    const add = e.target.closest('[data-extra-add]'), del = e.target.closest('[data-extra-del]');
+    if (add) {
+      if (state.cv.extras.length >= 8) return;
+      const heading = add.dataset.extraAdd;
+      state.cv.extras.push({ heading, items: [] });
+      state.edited = true;
+      save();
+      renderedHTML = '';
+      renderCV(true);
+      if (state.pane === 'form') buildForm();
+      closeSectionsPanel();
+      // go straight to the new section on the CV, ready to type
+      if (mobile()) $('#tab-cv').click();
+      const i = state.cv.extras.length - 1;
+      const target = sheet.querySelector(`[data-path="extras.${i}.${heading ? 'items.0' : 'heading'}"]`);
+      if (target) { revealOnCV(target); target.focus({ preventScroll: true }); }
+      toast(heading ? 'Section added. Type the first line, then press Enter for the next one.' : 'Section added. Type its name, then its first line.');
+    } else if (del) {
+      const i = +del.dataset.extraDel, g = state.cv.extras[i];
+      if (!g) return;
+      if ((g.items || []).length && !confirm(`Remove the "${g.heading || 'untitled'}" section from your CV?`)) return;
+      state.cv.extras.splice(i, 1);
+      state.edited = true;
+      afterSectionChange(true);
+    }
   });
 
   // ---------- the form editor ----------
@@ -446,7 +759,7 @@
     formEl.innerHTML = `
       <div class="card">
         <h2>Start from your old CV</h2>
-        <p class="sub">${state.mode === 'guided' ? 'Upload a Word file, a PDF or a photo of it. It is read right here in your browser, never sent anywhere, and fills in your new CV.' : 'Upload a PDF, Word file or a photo of it. The AI reads it and fills in your new CV, then asks what has changed.'}</p>
+        <p class="sub">${state.mode !== 'ai' ? 'Upload a Word file, a PDF or a photo of it. It is read right here in your browser, never sent anywhere, and fills in your new CV.' : 'Upload a PDF, Word file or a photo of it. The AI reads it and fills in your new CV, then asks what has changed.'}</p>
         <button type="button" class="ghost" data-act="import-cv">Upload my old CV</button>
       </div>
 
@@ -456,6 +769,7 @@
         <div class="photo-row">
           <div class="avatar">${safePhoto(state.photo) ? `<img src="${state.photo}" alt="Your photo">` : ICONS.camera}</div>
           <div class="photo-btns">
+            ${state.photo ? '<button type="button" class="ghost" data-act="photo-crop">Move or zoom</button>' : ''}
             <button type="button" class="ghost" data-act="photo">${state.photo ? 'Change photo' : 'Upload a photo'}</button>
             ${state.photo ? '<button type="button" class="ghost" data-act="photo-remove">Remove</button>' : ''}
           </div>
@@ -467,6 +781,12 @@
         <h2>Fonts and text size</h2>
         <p class="sub">Pick a font and make the name, headings or text bigger or smaller.</p>
         ${textControls('fm')}
+      </div>
+
+      <div class="card">
+        <h2>Sections and headings</h2>
+        <p class="sub">Keep your design, but choose which sections show and what they are called, in any language.</p>
+        ${sectionControls('fm', false)}
       </div>
 
       <div class="card">
@@ -547,7 +867,7 @@
               ${area(`extras.${i}.items`, 'Items', (g.items || []).join('\n'), 'One per line, e.g.\nFirst aid certificate, 2022', true)}
             </div>
           </div>`).join('')}
-        <div class="suggest">${['Certifications', 'Volunteering', 'Projects', 'Awards'].filter(h => !c.extras.some(g => g.heading === h)).map(h => `<button type="button" class="chip" data-act="add-extra" data-val="${h}">+ ${h}</button>`).join('')}<button type="button" class="chip" data-act="add-extra" data-val="">+ Another section</button></div>
+        ${extraChips('data-act="add-extra" data-val')}
       </div>`;
     formEl.scrollTop = scroll;
     if (focusSel) {
@@ -600,6 +920,7 @@
     const c = state.cv, list = b.dataset.list, i = +b.dataset.i;
     switch (b.dataset.act) {
       case 'photo': return pickPhoto();
+      case 'photo-crop': return photoClicked();
       case 'photo-remove': return removePhoto();
       case 'import-cv': return pickCV();
       case 'add-exp':
@@ -609,6 +930,7 @@
         c.education.push({ qualification: '', school: '', location: '', start: '', end: '', details: '' });
         return changed(`[data-bind="education.${c.education.length - 1}.qualification"]`);
       case 'add-extra':
+        if (c.extras.length >= 8) return;
         c.extras.push({ heading: b.dataset.val, items: [] });
         return changed(b.dataset.val ? `[data-lines="extras.${c.extras.length - 1}.items"]` : `[data-bind="extras.${c.extras.length - 1}.heading"]`);
       case 'del':
@@ -841,7 +1163,7 @@
   function parseDates(s) {
     const t = String(s).trim();
     const m = t.split(/\s+(?:to|until|till|-|–|—)\s+|\s*[-–—]\s*/i);
-    const fix = x => /^(now|present|current|today|still here|ongoing)$/i.test(String(x || '').trim()) ? 'Present' : titleCase(x || '');
+    const fix = x => /^(now|present|current|today|still here|ongoing)$/i.test(String(x || '').trim()) ? langById(state.sections.lang).t.present : titleCase(x || '');
     if (m.length >= 2) return [fix(m[0]), fix(m[1])];
     return [fix(t), ''];
   }
@@ -1448,7 +1770,7 @@
         const v = read[k];
         if (Array.isArray(v) ? v.length : String(v || '').trim()) c[k] = v;
       });
-      state.cv = normalize(c);
+      state.cv = translateCV(normalize(c), state.sections.lang);
       renderCV(true); save();
     }
     const cv = state.cv, n = (k, one) => `${k} ${one}${k === 1 ? '' : 's'}`;

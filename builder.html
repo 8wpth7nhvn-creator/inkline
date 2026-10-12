@@ -192,6 +192,43 @@ textarea.f-in{resize:vertical;min-height:84px}
 .tc-reset{align-self:flex-start;border:0;background:transparent;padding:4px 0;font-weight:600;font-size:14px;color:var(--violet);text-decoration:underline;text-underline-offset:3px}
 @media (max-width:560px){.tc-size{grid-template-columns:1fr 48px}.tc-size label{grid-column:1 / -1}.tc-size input{grid-column:1}}
 
+/* sections and headings */
+.mini-av.sec svg{width:15px;height:15px;color:var(--violet)}
+.sc-lang{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:10px}
+.sc-lang label,.sc-to label{font-size:14px;font-weight:600;color:var(--text-2)}
+.sc-select{padding:8px 10px}
+.sc-hint{font-size:13.5px;color:var(--text-2);margin:12px 0 8px;line-height:1.45}
+.sc-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.sc-list li{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px}
+.sc-list li .f-in{padding:8px 10px}
+.sc-list li.off .f-in{opacity:.55;text-decoration:line-through}
+.sc-check{width:20px;height:20px;accent-color:var(--violet);margin:0}
+.sc-dot{width:8px;height:8px;margin:0 6px;border-radius:50%;background:var(--violet)}
+.sc-list .small-btn{padding:8px 12px;background:transparent;color:var(--text-2);border:1px solid var(--line-strong)}
+.sc-to{display:grid;grid-template-columns:auto 90px 1fr;align-items:center;gap:10px;margin-top:14px}
+.sc-to .f-in{padding:8px 10px}
+.sc-example{font-size:13.5px;color:var(--text-2)}
+.sc-sub{margin:20px 0 8px;font-size:15px;font-weight:600}
+@media (max-width:560px){.sc-to{grid-template-columns:auto 1fr}.sc-example{grid-column:1 / -1}}
+@media (max-width:980px){.text-panel{position:fixed;top:64px;left:12px;right:12px;width:auto;max-height:calc(100dvh - 150px)}}
+
+/* cropping the photo */
+.cropper{position:fixed;inset:0;z-index:60;display:grid;place-items:center;padding:16px;background:rgba(16,18,63,.55);backdrop-filter:blur(4px);animation:fadeIn .25s var(--ease-out)}
+.crop-box{width:min(420px,100%);max-height:100%;overflow-y:auto;background:#fff;border-radius:22px;padding:18px 18px 20px;box-shadow:0 40px 80px -30px rgba(16,18,63,.6)}
+.crop-help{margin:0 0 12px;font-size:14px;color:var(--text-2)}
+.crop-stage{position:relative;width:100%;aspect-ratio:1;overflow:hidden;border-radius:14px;background:#1b1d3a;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none;outline-offset:3px}
+.crop-stage:active{cursor:grabbing}
+.crop-stage:focus:not(:focus-visible){outline:none}
+.crop-stage img{position:absolute;top:0;left:0;max-width:none;transform-origin:0 0;pointer-events:none;-webkit-user-drag:none}
+.crop-mask{position:absolute;pointer-events:none;box-shadow:0 0 0 999px rgba(16,18,63,.55);outline:2px solid rgba(255,255,255,.9)}
+.crop-mask.round{inset:0;border-radius:50%}
+.crop-mask.rect{top:0;bottom:0;left:8.1%;right:8.1%;border-radius:6px}
+.crop-zoom{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:12px;margin:14px 0 4px}
+.crop-zoom label{font-size:14px;font-weight:600;color:var(--text-2)}
+.crop-zoom input{width:100%;accent-color:var(--violet)}
+.crop-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.crop-actions .btn{margin-left:auto}
+
 /* design picker */
 .picker{position:absolute;inset:0;z-index:20;display:flex;flex-direction:column;background:rgba(230,238,245,.96);backdrop-filter:blur(8px);animation:fadeIn .3s var(--ease-out)}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
@@ -327,6 +364,7 @@ textarea.f-in{resize:vertical;min-height:84px}
       <div class="toolbar">
         <button class="design-btn" id="design-btn" type="button" aria-haspopup="dialog"><span class="thumb" id="design-thumb" aria-hidden="true"></span><span id="design-name">Design</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
         <button class="photo-btn" id="text-btn" type="button" aria-haspopup="dialog" aria-expanded="false"><span class="mini-av aa" aria-hidden="true">Aa</span><span id="text-label">Fonts &amp; size</span></button>
+        <button class="photo-btn" id="sections-btn" type="button" aria-haspopup="dialog" aria-expanded="false"><span class="mini-av sec" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/></svg></span><span>Sections</span></button>
         <button class="photo-btn" id="photo-btn" type="button"><span class="mini-av" id="photo-mini" aria-hidden="true"></span><span id="photo-label">Add photo</span></button>
         <div class="group"><span id="lbl-colour">Colour</span><div class="swatches" id="accents" role="group" aria-labelledby="lbl-colour"></div></div>
         <div class="group"><span id="lbl-paper">Paper</span><div class="seg" id="paper" role="group" aria-labelledby="lbl-paper"><button type="button" data-paper="a4">A4</button><button type="button" data-paper="letter">US Letter</button></div></div>
@@ -343,6 +381,11 @@ textarea.f-in{resize:vertical;min-height:84px}
       <div class="text-panel" id="text-panel" role="dialog" aria-labelledby="text-title" hidden>
         <div class="tp-head"><h2 id="text-title">Fonts and text size</h2><button class="ghost" id="text-close" type="button">Done</button></div>
         <div id="text-panel-body"></div>
+      </div>
+
+      <div class="text-panel" id="sections-panel" role="dialog" aria-labelledby="sections-title" hidden>
+        <div class="tp-head"><h2 id="sections-title">Sections and headings</h2><button class="ghost" id="sections-close" type="button">Done</button></div>
+        <div id="sections-panel-body"></div>
       </div>
 
       <div class="picker" id="picker" role="dialog" aria-modal="true" aria-labelledby="picker-title" hidden>
@@ -385,6 +428,24 @@ textarea.f-in{resize:vertical;min-height:84px}
       <span><b>Have an old CV?</b> Upload it as a Word file, PDF or even a photo. Inkline fills in a fresh CV from it, then asks what's new.</span>
     </button>
     <p class="foot">Your CV and photo stay saved in this browser. <a href="index.html">Back to the home page</a></p>
+  </div>
+</div>
+
+<div class="cropper" id="cropper" role="dialog" aria-modal="true" aria-labelledby="crop-title" hidden>
+  <div class="crop-box">
+    <div class="tp-head"><h2 id="crop-title">Adjust your photo</h2></div>
+    <p class="crop-help">Drag the photo to move it. Zoom with the slider, by pinching, or with your mouse wheel.</p>
+    <div class="crop-stage" id="crop-stage" tabindex="0" aria-label="Your photo. Use the arrow keys to move it and the plus and minus keys to zoom.">
+      <img id="crop-img" alt="" draggable="false">
+      <div class="crop-mask round" id="crop-mask"></div>
+    </div>
+    <div class="crop-zoom"><label for="crop-zoom">Zoom</label><input type="range" id="crop-zoom" min="1" max="4" step="0.01" value="1"></div>
+    <div class="crop-actions">
+      <button class="ghost" id="crop-change" type="button">Choose another</button>
+      <button class="ghost" id="crop-remove" type="button">Remove</button>
+      <button class="ghost" id="crop-cancel" type="button">Cancel</button>
+      <button class="btn" id="crop-done" type="button">Use photo</button>
+    </div>
   </div>
 </div>
 
