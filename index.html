@@ -77,6 +77,9 @@ main:focus,section[tabindex="-1"]:focus{outline:none}
 .nav a.nl:hover{color:var(--text);background:rgba(16,18,63,.05)}
 .nav .btn{padding:10px 18px;font-size:14.5px;margin-left:6px}
 @media (max-width:760px){.nav a.nl{display:none}.nav{left:12px;right:12px;transform:none;width:auto;justify-content:space-between}}
+/* the EN | NL switch sits in the top left corner; on phones the menu bar makes room for it */
+.lang-home{position:fixed;top:26px;left:16px;z-index:41}
+@media (max-width:760px){.nav{left:104px}.lang-home{top:25px;left:10px}}
 
 /* ---------- hero: the scroll-scrubbed ink ---------- */
 .hero{position:relative;height:560vh}
@@ -333,6 +336,7 @@ body.paused *,body.paused *::before,body.paused *::after{animation-play-state:pa
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
+<div class="lang-home" data-lang-switch></div>
 <div class="env" aria-hidden="true"><i></i><i></i></div>
 
 <nav class="nav" aria-label="Main">
@@ -922,6 +926,7 @@ body.paused *,body.paused *::before,body.paused *::after{animation-play-state:pa
   </div>
 </footer>
 
+<script src="assets/i18n.js"></script>
 <script src="assets/home.js"></script>
 </body>
 </html>

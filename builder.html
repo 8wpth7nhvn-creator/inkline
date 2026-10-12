@@ -273,8 +273,10 @@ textarea.f-in{resize:vertical;min-height:84px}
 .tpick span{font-size:13px;color:var(--text-2)}
 
 /* first screen: choose how to make the CV */
+.chooser-lang{position:absolute;top:16px;left:16px}
+@media (max-width:980px){.chooser-lang{position:static;display:flex;width:max-content;margin:0 0 18px}}
 .chooser{position:fixed;inset:0;z-index:60;display:grid;place-items:center;padding:24px;background:rgba(230,238,245,.82);backdrop-filter:blur(10px);animation:fadeIn .4s var(--ease-out)}
-.chooser-box{width:min(860px,100%);text-align:center}
+.chooser-box{position:relative;width:min(860px,100%);text-align:center}
 .chooser-box .kicker{font:500 12px/1.2 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--violet)}
 .chooser-box h1{margin:12px 0 10px;font:400 clamp(34px,4.6vw,54px)/1.05 var(--display);letter-spacing:-.01em}
 .chooser-box .lead{margin:0 auto 30px;max-width:46ch;color:var(--text-2);font-size:17px}
@@ -342,6 +344,7 @@ textarea.f-in{resize:vertical;min-height:84px}
       <svg viewBox="0 0 64 64" aria-hidden="true"><path d="M32 6C32 6 14 28 14 40a18 18 0 0 0 36 0C50 28 32 6 32 6z" fill="#10123F"/><circle cx="40" cy="44" r="5" fill="#C43D25"/></svg>
       Inkline
     </a>
+    <div data-lang-switch></div>
     <ol class="steps" id="steps" aria-label="Interview progress">
       <li data-stage="basics">Name</li><li data-stage="target">Job</li><li data-stage="contact">Contact</li><li data-stage="experience">Experience</li><li data-stage="education">Education</li><li data-stage="skills">Skills</li><li data-stage="extras">Extras</li><li data-stage="review">Ready</li>
     </ol>
@@ -447,6 +450,7 @@ textarea.f-in{resize:vertical;min-height:84px}
 
 <div class="chooser" id="chooser" role="dialog" aria-modal="true" aria-labelledby="chooser-title" hidden>
   <div class="chooser-box">
+    <div class="chooser-lang" data-lang-switch></div>
     <p class="kicker">Let's make your CV</p>
     <h1 id="chooser-title">How would you like to make it?</h1>
     <p class="lead">Both ways are free, and you can switch between them any time.</p>
@@ -495,6 +499,7 @@ textarea.f-in{resize:vertical;min-height:84px}
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <div id="print-root" aria-hidden="true"></div>
 
+<script src="assets/i18n.js"></script>
 <script src="assets/cv-icons.js"></script>
 <script src="assets/cv.js"></script>
 <script src="assets/builder.js"></script>

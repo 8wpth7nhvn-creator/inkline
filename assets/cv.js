@@ -212,8 +212,12 @@
   };
   const LABELS = { email: 'Email', phone: 'Phone', location: 'City', link: 'Website or LinkedIn' };
 
+  // Interface words shown on the CV while editing (placeholders, hints) follow the site's language.
+  const T = s => (global.I18N ? global.I18N.t(s) : s);
+
   // field(): one editable text span bound to a path in the CV object.
   function field(tag, path, value, cls, placeholder, editable) {
+    placeholder = placeholder && editable ? T(placeholder) : placeholder;
     const empty = !String(value || '').trim();
     if (empty && !editable) return '';
     const attrs = editable
@@ -245,18 +249,18 @@
     const hidden = key => !!(S.hidden && S.hidden[key]);
     // Section headings can be renamed by clicking them on the CV.
     const h2 = key => ed
-      ? `<h2 data-heading="${key}" contenteditable="true" spellcheck="true" title="Click to rename this section">${esc(sectionTitle(key, S))}</h2>`
+      ? `<h2 data-heading="${key}" contenteditable="true" spellcheck="true" title="${esc(T('Click to rename this section'))}">${esc(sectionTitle(key, S))}</h2>`
       : `<h2>${esc(sectionTitle(key, S))}</h2>`;
     const to = dateWord(S);
     const contactSpans = () => hidden('contact') ? '' : ['email', 'phone', 'location', 'link']
       .map(k => (c[k] || ed) ? field('span', k, c[k], '', ed ? LABELS[k] : '', ed) : '')
       .filter(Boolean).join('');
     const nameTitle = () =>
-      (field('h1', 'name', c.name, 'cv-name', 'Your name', ed) || '<h1 class="cv-name cv-empty">Your name</h1>') +
+      (field('h1', 'name', c.name, 'cv-name', 'Your name', ed) || `<h1 class="cv-name cv-empty">${esc(T('Your name'))}</h1>`) +
       field('p', 'title', c.title, 'cv-title', 'The job you want', ed);
     // The word between dates ("to") can be changed by clicking it; it changes on every entry at once.
     const dates = (base, x) => ed
-      ? `${field('span', `${base}.start`, x.start, '', 'Start', ed)} <span class="cv-to" data-word="to" contenteditable="true" spellcheck="false" title="Click to change this word">${esc(to)}</span> ${field('span', `${base}.end`, x.end, '', 'End', ed)}`
+      ? `${field('span', `${base}.start`, x.start, '', 'Start', ed)} <span class="cv-to" data-word="to" contenteditable="true" spellcheck="false" title="${esc(T('Click to change this word'))}">${esc(to)}</span> ${field('span', `${base}.end`, x.end, '', 'End', ed)}`
       : range(x.start, x.end, to);
 
     const B = {
@@ -267,8 +271,8 @@
       },
       photo() {
         const act = ed ? ' data-action="photo" role="button" tabindex="0"' : '';
-        if (opts.photo) return `<div class="cv-photo"${act}${ed ? ' aria-label="Move, zoom or change your photo" title="Click to move, zoom or change your photo"' : ''}><img src="${esc(opts.photo)}" alt=""></div>`;
-        if (ed) return `<div class="cv-photo cv-addphoto"${act} aria-label="Add your photo"><span>${ICONS.camera}Add photo</span></div>`;
+        if (opts.photo) return `<div class="cv-photo"${act}${ed ? ` aria-label="${esc(T('Move, zoom or change your photo'))}" title="${esc(T('Click to move, zoom or change your photo'))}"` : ''}><img src="${esc(opts.photo)}" alt=""></div>`;
+        if (ed) return `<div class="cv-photo cv-addphoto"${act} aria-label="${esc(T('Add your photo'))}"><span>${ICONS.camera}${esc(T('Add photo'))}</span></div>`;
         if (t.group === 'photo') return `<div class="cv-photo cv-mono" aria-hidden="true"><span>${esc(initials(c.name))}</span></div>`;
         return '';
       },
@@ -343,10 +347,10 @@
       // brand logos stay dark or white, as their owners ask; other icons may also take the design's colour
       const tone = TONES.includes(b.tone) && !(ic.brand && b.tone === 'accent') ? b.tone : 'dark';
       const size = SIZES.includes(b.size) ? b.size : 'm';
-      const handle = ed ? ` data-badge-drag="${i}" tabindex="0" role="button" aria-label="Move this ${esc(ic.name)} icon" title="Drag to move"` : '';
+      const handle = ed ? ` data-badge-drag="${i}" tabindex="0" role="button" aria-label="${esc(T(`Move this ${ic.name} icon`))}" title="${esc(T('Drag to move'))}"` : '';
       const mark = ic.svg ? `<span class="cv-badge-ic"${handle}>${ic.svg}</span>` : (ed ? `<span class="cv-badge-grip"${handle}></span>` : '');
       const words = ed
-        ? `<span class="cv-badge-text" data-badge-text="${i}" contenteditable="true" spellcheck="true" data-ph="${esc(ic.ph)}">${esc(text)}</span>`
+        ? `<span class="cv-badge-text" data-badge-text="${i}" contenteditable="true" spellcheck="true" data-ph="${esc(T(ic.ph))}">${esc(text)}</span>`
         : (text.trim() ? `<span class="cv-badge-text">${esc(text)}</span>` : '');
       const x = Math.max(0, Math.min(600, Number(b.x) || 0)), y = Math.max(0, Math.min(6000, Number(b.y) || 0));
       return `<div class="cv-badge tone-${tone} size-${size}" style="left:${x.toFixed(1)}pt;top:${y.toFixed(1)}pt" data-badge="${i}">${mark}${words}</div>`;

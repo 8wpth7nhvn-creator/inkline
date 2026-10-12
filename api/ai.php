@@ -42,6 +42,8 @@ $in = json_decode($raw, true);
 if (!is_array($in)) { log_event('request_rejected', ['reason' => 'bad_json']); fail(400, 'bad_request', 'The request could not be read.'); }
 $action = $in['action'] ?? '';
 if (!in_array($action, ['start', 'chat', 'import', 'end'], true)) { log_event('request_rejected', ['reason' => 'bad_action']); fail(400, 'bad_request', 'Unknown request.'); }
+// The language the visitor uses the site in (English or Dutch); anything else counts as English.
+$uiLang = ($in['lang'] ?? 'en') === 'nl' ? 'nl' : 'en';
 
 // ---------- conversations, stored on the server ----------
 function conv_path(string $id): string { return data_dir('conv') . '/' . $id . '.json'; }
@@ -60,10 +62,10 @@ function conv_expired(array $conv): bool {
     return (time() - (int)($conv['created'] ?? 0)) > settings()['retention_hours'] * 3600;
 }
 
-function new_conversation(?array $cv): array {
+function new_conversation(?array $cv, string $lang = 'en'): array {
     $id = bin2hex(random_bytes(16));
-    $open = opening_turns($cv);
-    $conv = ['id' => $id, 'provider' => settings()['provider'], 'model' => settings()['model'], 'created' => time(), 'turns' => 0, 'history' => $open['history']];
+    $open = opening_turns($cv, $lang);
+    $conv = ['id' => $id, 'provider' => settings()['provider'], 'model' => settings()['model'], 'created' => time(), 'turns' => 0, 'lang' => $lang, 'history' => $open['history']];
     file_put_contents(conv_path($id), json_encode($conv, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), LOCK_EX);
     @chmod(conv_path($id), 0600);
     log_event('conversation_started', ['provider' => $conv['provider']]);
@@ -96,7 +98,7 @@ function ai_failed(array $r, string $action): void {
 if ($action === 'start') {
     $cv = isset($in['cv']) && is_array($in['cv']) ? normalize_cv($in['cv']) : null;
     enforce_daily_limits(false, true, false);
-    [$conv, $open] = new_conversation($cv);
+    [$conv, $open] = new_conversation($cv, $uiLang);
     json_out(200, ['ok' => true, 'conversation' => $conv['id'], 'greeting' => $open['greeting'], 'quick_replies' => $open['quick_replies']]);
 }
 
@@ -122,7 +124,7 @@ if ($action === 'chat') {
         $lastCv = $editedCv ?? (json_decode(flatten_text(end($conv['history'])['content']), true)['cv'] ?? []);
         $history = trim_history($conv['history'], normalize_cv($lastCv));
         $history[] = ['role' => 'user', 'content' => $content];
-        $r = ai_call(chat_system_prompt(), $history, chat_schema());
+        $r = ai_call(chat_system_prompt() . language_note($conv['lang'] ?? $uiLang), $history, chat_schema());
         if (!$r['ok']) return ['failed' => $r];
         // CV topics only. If the AI marks a message as off topic, whatever it wrote is thrown away:
         // the visitor gets a fixed reply, the CV stays as it was, and the off-topic text never
@@ -160,11 +162,11 @@ if ($action === 'import') {
     $id = valid_conversation_id($in['conversation'] ?? null);
     $exists = $id && is_file(conv_path($id));
     enforce_daily_limits(true, !$exists, true);
-    if (!$exists) { [$conv] = new_conversation(null); $id = $conv['id']; }
+    if (!$exists) { [$conv] = new_conversation(null, $uiLang); $id = $conv['id']; }
 
     // The file goes straight to the AI from memory. It is never written to disk.
     $ask = 'This is my old CV. Please read it and fill in my new CV from it.' . ($text !== '' ? "\n<old_cv>\n" . $text . "\n</old_cv>" : '');
-    $r = ai_call(import_system_prompt(), [['role' => 'user', 'content' => $ask]], import_schema(), $files);
+    $r = ai_call(import_system_prompt() . language_note($uiLang), [['role' => 'user', 'content' => $ask]], import_schema(), $files);
     unset($files, $raw, $in);
     if (!$r['ok']) ai_failed($r, 'import');
     $d = $r['json'];

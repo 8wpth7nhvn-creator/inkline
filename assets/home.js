@@ -2,6 +2,7 @@
 (function () {
   'use strict';
   const $ = s => document.querySelector(s);
+  const t = s => (window.I18N ? window.I18N.t(s) : s);   // Dutch or English, chosen with the EN | NL switch
   const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
   const smoothstep = (p, e0, e1) => { const t = clamp((p - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t); };
   const reduceMQ = matchMedia('(prefers-reduced-motion: reduce)');
@@ -330,7 +331,7 @@
     { ctx: 'Social media assistant · Bloom Florists', before: 'Responsible for social media.', after: 'Grew our Instagram from 2,000 to 18,000 followers in one year.' },
     { ctx: 'Barista · Corner Café', before: 'Worked on the coffee machine and the till.', after: 'Served 250 customers a day and trained four new baristas.' },
     { ctx: 'Retail assistant · City Books', before: 'Helped with customer complaints.', after: 'Solved about 30 customer problems a week, so fewer people asked for refunds.' }
-  ];
+  ].map(e => ({ ctx: t(e.ctx), before: t(e.before), after: t(e.after) }));
   const paper = $('#paper'), holdBtn = $('#hold'), afterEl = $('#after');
   let ex = 0, prog = 0, holding = false, holdRaf = null, holdLast = 0, complete = false, lastP = -1;
   function setExample(i) {
@@ -348,7 +349,7 @@
     });
     complete = false; prog = 0; lastP = -1;
     paper.classList.remove('done');
-    $('#hold-label').textContent = 'Hold to rewrite';
+    $('#hold-label').textContent = t('Hold to rewrite');
     writeP(reduceMQ.matches ? 1 : 0);
     if (reduceMQ.matches) finish();
   }
@@ -361,8 +362,8 @@
   function finish() {
     complete = true;
     paper.classList.add('done');
-    $('#after-sr').textContent = 'Rewritten: ' + EXAMPLES[ex].after;
-    $('#hold-label').textContent = 'Rewritten';
+    $('#after-sr').textContent = t('Rewritten:') + ' ' + EXAMPLES[ex].after;
+    $('#hold-label').textContent = t('Rewritten');
   }
   function holdTick(now) {
     const dt = Math.min(64, now - (holdLast || now)); holdLast = now;

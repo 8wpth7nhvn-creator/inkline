@@ -10,6 +10,11 @@
   const API = 'api/ai.php';
   const STAGES = ['basics', 'target', 'contact', 'experience', 'education', 'skills', 'extras', 'review'];
   const mobile = () => matchMedia('(max-width:980px)').matches;
+  // Interface text in English or Dutch (assets/i18n.js). Most text is translated as it appears on screen;
+  // t() is for words that never reach the page, like pop-up questions and suggestions that become CV text.
+  const UI_LANG = window.I18N ? window.I18N.lang : 'en';
+  const t = (s, v) => (window.I18N ? window.I18N.t(s, v) : (v ? s.replace(/\{(\w+)\}/g, (m, k) => (k in v ? v[k] : m)) : s));
+  const cvDutch = () => state.sections.lang === 'nl';
 
   // A photo is only ever a picture we drew ourselves (a JPEG data URL). Anything else is refused,
   // so nothing unexpected can ever be put into the page.
@@ -25,7 +30,7 @@
       photoSrc: '',          // the whole photo (made smaller), kept so it can be cropped again
       photoCrop: null,       // where the crop sits in it: centre x, centre y (0 to 1) and zoom
       font: 'default', sizes: { name: 1, head: 1, text: 1 },
-      sections: cleanSections(),   // heading language, renamed or hidden sections, the word between dates
+      sections: cleanSections({ lang: UI_LANG }),   // heading language, renamed or hidden sections, the word between dates
       badges: [],            // icons with text placed anywhere on the page
       started: false,
       pane: 'chat',          // 'chat' or 'form'
@@ -502,7 +507,7 @@
     setTimeout(() => { b.textContent = 'Copy as text'; }, 1800);
   });
   $('#restart').addEventListener('click', () => {
-    if (!confirm('Start a new CV? This deletes your CV, photo and chat from this browser, and the chat from our server.')) return;
+    if (!confirm(t('Start a new CV? This deletes your CV, photo and chat from this browser, and the chat from our server.'))) return;
     if (state.conversation) api({ action: 'end', conversation: state.conversation });
     try { localStorage.removeItem(STORE); } catch (e) { /* nothing stored */ }
     const keep = { template: state.template, accent: state.accent, paper: state.paper, font: state.font, sizes: state.sizes, sections: state.sections };
@@ -775,7 +780,7 @@
     } else if (del) {
       const i = +del.dataset.extraDel, g = state.cv.extras[i];
       if (!g) return;
-      if ((g.items || []).length && !confirm(`Remove the "${g.heading || 'untitled'}" section from your CV?`)) return;
+      if ((g.items || []).length && !confirm(t('Remove the "{name}" section from your CV?', { name: g.heading || t('untitled') }))) return;
       state.cv.extras.splice(i, 1);
       state.edited = true;
       afterSectionChange(true);
@@ -955,7 +960,7 @@
       <button type="button" class="icon-btn danger" data-act="del" data-list="${list}" data-i="${i}" aria-label="Remove">${I.del}</button>
     </div>`;
   const chips = (list, label, ph, suggestions) => `
-    <div class="chips-in">${state.cv[list].map((s, i) => `<span class="tagchip">${esc(s)}<button type="button" data-act="chip-del" data-list="${list}" data-i="${i}" aria-label="Remove ${esc(s)}">${I.x}</button></span>`).join('')}</div>
+    <div class="chips-in">${state.cv[list].map((s, i) => `<span class="tagchip">${esc(s)}<button type="button" data-act="chip-del" data-list="${list}" data-i="${i}" aria-label="${esc(t('Remove {item}', { item: s }))}">${I.x}</button></span>`).join('')}</div>
     <div class="chip-add"><label class="sr-only" for="add-${list}">${label}</label><input class="f-in" id="add-${list}" data-chipinput="${list}" placeholder="${esc(ph)}"><button type="button" class="small-btn" data-act="chip-add" data-list="${list}">Add</button></div>
     ${suggestions ? `<div class="suggest">${suggestions.filter(s => !state.cv[list].includes(s)).map(s => `<button type="button" class="chip" data-act="chip-suggest" data-list="${list}" data-val="${esc(s)}">+ ${esc(s)}</button>`).join('')}</div>` : ''}`;
 
@@ -1055,13 +1060,13 @@
       <div class="card">
         <h2>Skills</h2>
         <p class="sub">Type a skill and press Enter.</p>
-        ${chips('skills', 'Add a skill', 'e.g. Customer service', ['Communication', 'Teamwork', 'Microsoft Excel', 'Customer service', 'Problem solving', 'Leadership'])}
+        ${chips('skills', 'Add a skill', 'e.g. Customer service', ['Communication', 'Teamwork', 'Microsoft Excel', 'Customer service', 'Problem solving', 'Leadership'].map(x => t(x)))}
       </div>
 
       <div class="card">
         <h2>Languages</h2>
         <p class="sub">Add how well you speak each one.</p>
-        ${chips('languages', 'Add a language', 'e.g. Arabic (native)', ['English (fluent)', 'Arabic (native)', 'French (basic)'])}
+        ${chips('languages', 'Add a language', 'e.g. Arabic (native)', ['English (fluent)', 'Arabic (native)', 'French (basic)'].map(x => t(x)))}
       </div>
 
       <div class="card">
@@ -1142,7 +1147,7 @@
         c.extras.push({ heading: b.dataset.val, items: [] });
         return changed(b.dataset.val ? `[data-lines="extras.${c.extras.length - 1}.items"]` : `[data-bind="extras.${c.extras.length - 1}.heading"]`);
       case 'del':
-        if (!isBlank(c[list][i]) && !confirm('Remove this from your CV?')) return;
+        if (!isBlank(c[list][i]) && !confirm(t('Remove this from your CV?'))) return;
         c[list].splice(i, 1);
         return changed();
       case 'up': if (i > 0) { [c[list][i - 1], c[list][i]] = [c[list][i], c[list][i - 1]]; changed(); } return;
@@ -1253,7 +1258,7 @@
       const r = await fetch(API, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Inkline-Client': '1' },
-        body: JSON.stringify(body),
+        body: JSON.stringify(Object.assign({ lang: UI_LANG }, body)),
         credentials: 'same-origin'
       });
       const j = await r.json().catch(() => null);
@@ -1358,7 +1363,7 @@
   const titleCase = s => String(s || '').trim().replace(/\s+/g, ' ')
     .split(' ').map((w, i) => (i > 0 && SMALL.test(w)) ? w.toLowerCase() : w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
   const capFirst = s => { s = String(s || '').trim(); return s.charAt(0).toUpperCase() + s.slice(1); };
-  const isSkip = s => /^(skip|no|none|nope|n\/a|not yet|no photo|that'?s all|i don'?t (know|have)|-)$/i.test(String(s).trim().replace(/[.!]$/, ''));
+  const isSkip = s => /^(skip|no|none|nope|n\/a|not yet|no photo|that'?s all|i don'?t (know|have)|-|overslaan|nee|geen|niks|niets|nog niet|geen foto|dat is alles|weet ik niet|heb ik niet|klaar)$/i.test(String(s).trim().replace(/[.!]$/, ''));
   const splitList = s => String(s).split(/\n|,|;/).map(x => x.trim().replace(/^[-•*]\s*/, '')).filter(Boolean);
   // Split answers into points: by line, or else by sentence (works in every browser, no lookbehind needed).
   const splitLines = s => {
@@ -1370,8 +1375,8 @@
   };
   function parseDates(s) {
     const t = String(s).trim();
-    const m = t.split(/\s+(?:to|until|till|-|–|—)\s+|\s*[-–—]\s*/i);
-    const fix = x => /^(now|present|current|today|still here|ongoing)$/i.test(String(x || '').trim()) ? langById(state.sections.lang).t.present : titleCase(x || '');
+    const m = t.split(/\s+(?:to|until|till|tot|t\/m|-|–|—)\s+|\s*[-–—]\s*/i);
+    const fix = x => /^(now|present|current|today|still here|ongoing|nu|heden|huidig|momenteel|vandaag)$/i.test(String(x || '').trim()) ? langById(state.sections.lang).t.present : titleCase(x || '');
     if (m.length >= 2) return [fix(m[0]), fix(m[1])];
     return [fix(t), ''];
   }
@@ -1456,8 +1461,8 @@
       case 'phone': if (!skip) c.phone = text.trim(); return go('location');
       case 'location': if (!skip) c.location = titleCase(text); return go('link');
       case 'link': if (!skip) c.link = text.trim().replace(/^https?:\/\/(www\.)?/i, ''); return go(state.photo ? 'expHas' : 'photo');
-      case 'photo': if (/add/i.test(text)) pickPhoto(); return go('expHas');
-      case 'expHas': return go(skip || /^not/i.test(text) ? 'eduQual' : 'expRole');
+      case 'photo': if (/add|toevoeg|^ja\b/i.test(text)) pickPhoto(); return go('expHas');
+      case 'expHas': return go(skip || /^not|^nog niet|^nee/i.test(text) ? 'eduQual' : 'expRole');
       case 'expRole': {
         const job = { role: titleCase(text), company: '', location: '', start: '', end: '', bullets: [] };
         // New jobs since the old CV go at the top, newest first
@@ -1475,9 +1480,9 @@
         return go('expMore');
       }
       case 'oldEnd':
-        if (!skip && !/still|yes|both/i.test(text) && c.experience[g.oldIndex]) c.experience[g.oldIndex].end = parseDates(text)[0];
+        if (!skip && !/still|yes|both|nog|^ja\b|allebei/i.test(text) && c.experience[g.oldIndex]) c.experience[g.oldIndex].end = parseDates(text)[0];
         return go('expMore');
-      case 'expMore': return go(/another|yes|add/i.test(text) ? 'expRole' : g.updating ? 'whatsNew' : 'eduQual');
+      case 'expMore': return go(/another|yes|add|nog een|^ja\b|toevoeg/i.test(text) ? 'expRole' : g.updating ? 'whatsNew' : 'eduQual');
       case 'eduQual': {
         if (skip) return go(g.updating ? 'whatsNew' : 'skills');
         const study = { qualification: titleCase(text), school: '', location: '', start: '', end: '', details: '' };
@@ -1487,24 +1492,24 @@
       }
       case 'eduSchool': { const [s, city] = placeAndCity(text); Object.assign(c.education[g.eduIndex], { school: s, location: titleCase(city) }); return go('eduDates'); }
       case 'eduDates': { const [a, b] = parseDates(text); Object.assign(c.education[g.eduIndex], { start: a, end: b }); return go('eduMore'); }
-      case 'eduMore': return go(/another|yes|add/i.test(text) ? 'eduQual' : g.updating ? 'whatsNew' : 'skills');
+      case 'eduMore': return go(/another|yes|add|nog een|^ja\b|toevoeg/i.test(text) ? 'eduQual' : g.updating ? 'whatsNew' : 'skills');
       case 'whatsNew':
-        if (skip || /^(no|nope|nothing|none|same|done)\b|that'?s all|show (me )?(the )?designs/i.test(text)) { g.updating = false; return go('review'); }
-        if (/job|work|position|role|employ|promot/i.test(text)) { g.updating = true; return go('expRole'); }
-        if (/qualif|degree|diploma|course|certif|stud|school|educat|training/i.test(text)) { g.updating = true; return go('eduQual'); }
+        if (skip || /^(no|nope|nothing|none|same|done|nee|niets|niks|geen|klaar|hetzelfde)\b|that'?s all|show (me )?(the )?designs|verder niets|dat is alles|ontwerpen/i.test(text)) { g.updating = false; return go('review'); }
+        if (/job|work|position|role|employ|promot|baan|werk|functie|promotie/i.test(text)) { g.updating = true; return go('expRole'); }
+        if (/qualif|degree|diploma|course|certif|stud|school|educat|training|opleiding|cursus/i.test(text)) { g.updating = true; return go('eduQual'); }
         bubble('ai', "To add it, press Add a new job or Add a qualification and I'll ask for the details. For anything else, click the text on your CV and type.");
         setQuick(G.whatsNew.quick); save();
         return;
       case 'skills': if (!skip) c.skills = splitList(text).map(capFirst).slice(0, 20); return go('languages');
-      case 'languages': if (/just english/i.test(text)) c.languages = ['English']; else if (!skip) c.languages = splitList(text).map(capFirst); return go('extras');
-      case 'extras': if (!skip) c.extras = [{ heading: 'Highlights', items: splitLines(text).map(tidy).filter(Boolean) }]; return go('summary');
+      case 'languages': if (/just english|alleen engels/i.test(text)) c.languages = [cvDutch() ? 'Engels' : 'English']; else if (!skip) c.languages = splitList(text).map(capFirst); return go('extras');
+      case 'extras': if (!skip) c.extras = [{ heading: cvDutch() ? 'Hoogtepunten' : 'Highlights', items: splitLines(text).map(tidy).filter(Boolean) }]; return go('summary');
       case 'summary':
-        if (/write one/i.test(text) || skip) c.summary = autoSummary(c);
+        if (/write one|schrijf/i.test(text) || skip) c.summary = autoSummary(c);
         else c.summary = tidy(text);
         return go('review');
       case 'review':
-        if (/design/i.test(text)) { designsBubble(suggestedFor()); return; }
-        if (/new cv|start/i.test(text)) { $('#restart').click(); return; }
+        if (/design|ontwerp/i.test(text)) { designsBubble(suggestedFor()); return; }
+        if (/new cv|start|nieuw cv|opnieuw/i.test(text)) { $('#restart').click(); return; }
         bubble('ai', 'You can change anything by clicking the text on your CV, or switch to Fill in myself for a simple form. When it looks right, press Download PDF.');
         return;
     }
@@ -1514,10 +1519,11 @@
     const role = c.title || (c.experience[0] && c.experience[0].role) || '';
     const places = c.experience.map(x => x.company).filter(Boolean).slice(0, 2);
     const skills = c.skills.slice(0, 3).map(s => s.toLowerCase());
-    const parts = [];
-    if (role && places.length) parts.push(`${role} with experience at ${places.join(' and ')}.`);
-    else if (role) parts.push(`Hard-working candidate looking for a role as a ${role.toLowerCase()}.`);
-    if (skills.length) parts.push(`Strong in ${skills.length > 1 ? skills.slice(0, -1).join(', ') + ' and ' + skills[skills.length - 1] : skills[0]}.`);
+    const parts = [], nl = cvDutch(), and = nl ? ' en ' : ' and ';
+    const list = skills.length > 1 ? skills.slice(0, -1).join(', ') + and + skills[skills.length - 1] : skills[0];
+    if (role && places.length) parts.push(nl ? `${role} met ervaring bij ${places.join(and)}.` : `${role} with experience at ${places.join(and)}.`);
+    else if (role) parts.push(nl ? `Harde werker op zoek naar een functie als ${role.toLowerCase()}.` : `Hard-working candidate looking for a role as a ${role.toLowerCase()}.`);
+    if (skills.length) parts.push(nl ? `Sterk in ${list}.` : `Strong in ${list}.`);
     return parts.join(' ');
   }
 
@@ -1759,7 +1765,7 @@
     if (state.pane !== 'chat') setPane('chat');
     await startChat();
     if (state.cv.name || state.cv.experience.length) {
-      if (!confirm('Replace your current CV with the details from this file?')) return;
+      if (!confirm(t('Replace your current CV with the details from this file?'))) return;
     }
     bubble('me', 'Uploaded my old CV: ' + files.map(f => f.name).join(', '));
     for (const f of files) if (!fileKind(f)) { const k = await sniffKind(f).catch(() => null); if (k) KINDS.set(f, k); }
@@ -1991,7 +1997,8 @@
       if (read.education.length) found.push(n(read.education.length, 'qualification'));
       if (read.skills.length) found.push(n(read.skills.length, 'skill'));
       if (read.languages.length) found.push(n(read.languages.length, 'language'));
-      read.extras.forEach(x => found.push('your ' + x.heading.toLowerCase()));
+      // the file's extra sections replaced the CV's, with their names already in the CV's language
+      if (read.extras.length) state.cv.extras.forEach(x => found.push('your ' + x.heading.toLowerCase()));
     }
     const list = found.join(', ').replace(/, ([^,]*)$/, ' and $1');
     const fromPicture = pictures.length > 0 && !ocrFailed;
@@ -2018,25 +2025,25 @@
   }
 
   // ---------- answering common questions when the AI is off ----------
-  const looksLikeQuestion = t => /\?\s*$/.test(t) || (/^(how|what|should|can|could|do|does|is|are|why|when|which|will|would)\b/i.test(t.trim()) && t.trim().split(/\s+/).length >= 4);
+  const looksLikeQuestion = q => /\?\s*$/.test(q) || (/^(how|what|should|can|could|do|does|is|are|why|when|which|will|would|hoe|wat|moet|kan|kun|mag|waarom|wanneer|welke|wie|waar|zijn|heb|hoeveel|zou|wil)\b/i.test(q.trim()) && q.trim().split(/\s+/).length >= 4);
   const FAQ = [
-    [/photo|picture|headshot/i, 'It depends on where you apply. In the US and UK, CVs usually have no photo. In much of Europe, the Middle East and Asia, a friendly, professional photo is common. Many of the colourful designs have a photo spot.'],
-    [/how long|length|how many pages|one page|two pages|1 page|2 pages/i, 'Keep it to one page if you have less than about ten years of experience, and two pages at most. Short, clear lines beat long paragraphs.'],
-    [/reference/i, "You don't need to list references on your CV. Employers will ask for them later if they want them."],
-    [/\bgaps?\b|career break|unemploy|time off/i, "Be honest and keep it short. A line like 'Career break, caring for family' or 'Studying for a certificate' is fine. Gaps are very common."],
-    [/gpa|grades?\b|marks|score/i, "Add your grades if they're good and you finished studying in the last few years. Otherwise you can leave them out."],
-    [/hobb|interests?/i, 'Only add hobbies if they show a useful skill, like team sports or volunteering. Otherwise they take space you need for experience.'],
-    [/\bats\b|hiring software|robot|online application|applicant tracking/i, "For online application forms, choose a Classic design. They're one clean column, which hiring software reads best."],
-    [/salary|wage/i, "Leave salary off your CV. It's usually discussed later, once they're interested."],
-    [/\bage\b|birth|marital|married|nationality|religion/i, "In many countries you shouldn't add your age, date of birth or marital status. In some places, like the Gulf, nationality is often expected. Add it only if it's normal where you apply."],
-    [/cover letter/i, 'A short cover letter helps: three short paragraphs saying why this job, what you bring, and that you would love to talk.'],
-    [/free|cost|price|pay for|charge/i, 'Inkline is free. No card, no trial and no watermark on your PDF.'],
-    [/font|text size|bigger|smaller/i, 'Use the Fonts & size button above your CV to pick a font and make the name, headings or text bigger or smaller.'],
-    [/design|template|layout|colou?r|style/i, `Press the Design button above your CV to see all ${TEMPLATES.length} designs. The Colour button next to it has ${ACCENTS.length} colours, or pick any colour you like.`],
-    [/download|pdf|save|print/i, 'When your CV is ready, press Download PDF above it and choose Save as PDF.'],
-    [/upload|old cv|existing cv|import/i, 'You can upload your old CV with the paperclip button next to the message box.'],
-    [/edit|change|fix|mistake|typo/i, 'Click any text on your CV and type to change it, or switch to Fill in myself to edit everything in a simple form.'],
-    [/\blie\b|exaggerat|fake/i, 'Always keep your CV honest. Employers check, and a strong, true line beats a big claim.']
+    [/photo|picture|headshot|foto/i, 'It depends on where you apply. In the US and UK, CVs usually have no photo. In much of Europe, the Middle East and Asia, a friendly, professional photo is common. Many of the colourful designs have a photo spot.'],
+    [/how long|length|how many pages|one page|two pages|1 page|2 pages|hoe lang|lengte|pagina/i, 'Keep it to one page if you have less than about ten years of experience, and two pages at most. Short, clear lines beat long paragraphs.'],
+    [/reference|referentie/i, "You don't need to list references on your CV. Employers will ask for them later if they want them."],
+    [/\bgaps?\b|career break|unemploy|time off|\bgat\b|tussenjaar|werkloos|onderbreking/i, "Be honest and keep it short. A line like 'Career break, caring for family' or 'Studying for a certificate' is fine. Gaps are very common."],
+    [/gpa|grades?\b|marks|score|cijfer/i, "Add your grades if they're good and you finished studying in the last few years. Otherwise you can leave them out."],
+    [/hobb|interests?|interesse/i, 'Only add hobbies if they show a useful skill, like team sports or volunteering. Otherwise they take space you need for experience.'],
+    [/\bats\b|hiring software|robot|online application|applicant tracking|sollicitatiesoftware|online sollicit/i, "For online application forms, choose a Classic design. They're one clean column, which hiring software reads best."],
+    [/salary|wage|salaris|loon/i, "Leave salary off your CV. It's usually discussed later, once they're interested."],
+    [/\bage\b|birth|marital|married|nationality|religion|leeftijd|geboorte|getrouwd|nationaliteit|geloof|religie/i, "In many countries you shouldn't add your age, date of birth or marital status. In some places, like the Gulf, nationality is often expected. Add it only if it's normal where you apply."],
+    [/cover letter|motivatiebrief|sollicitatiebrief/i, 'A short cover letter helps: three short paragraphs saying why this job, what you bring, and that you would love to talk.'],
+    [/free|cost|price|pay for|charge|gratis|kost|prijs|betalen/i, 'Inkline is free. No card, no trial and no watermark on your PDF.'],
+    [/font|text size|bigger|smaller|lettertype|groter|kleiner/i, 'Use the Fonts & size button above your CV to pick a font and make the name, headings or text bigger or smaller.'],
+    [/design|template|layout|colou?r|style|ontwerp|sjabloon|opmaak|kleur|stijl/i, `Press the Design button above your CV to see all ${TEMPLATES.length} designs. The Colour button next to it has ${ACCENTS.length} colours, or pick any colour you like.`],
+    [/download|pdf|save|print|opslaan|printen/i, 'When your CV is ready, press Download PDF above it and choose Save as PDF.'],
+    [/upload|old cv|existing cv|import|oud cv|oude cv/i, 'You can upload your old CV with the paperclip button next to the message box.'],
+    [/edit|change|fix|mistake|typo|bewerk|wijzig|aanpas|fout/i, 'Click any text on your CV and type to change it, or switch to Fill in myself to edit everything in a simple form.'],
+    [/\blie\b|exaggerat|fake|liegen|overdrijv|nep/i, 'Always keep your CV honest. Employers check, and a strong, true line beats a big claim.']
   ];
 
   // ---------- starting the chat ----------

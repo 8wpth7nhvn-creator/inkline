@@ -110,15 +110,28 @@ function import_schema(): array {
 }
 
 // The conversation opens the same way every time; the visitor's existing CV (if any) rides along.
-function opening_turns(?array $cv): array {
+// For visitors using the site in Dutch: replies in Dutch, unless they write in another language.
+function language_note(string $lang): string {
+    return $lang === 'nl'
+        ? "\n\nThe visitor is using Inkline in Dutch. Write `reply` and `quick_replies` in Dutch, unless the visitor writes to you in another language; then use theirs. Write the CV itself in the language the visitor uses for their CV."
+        : '';
+}
+
+function opening_turns(?array $cv, string $lang = 'en'): array {
     $begun = $cv && ($cv['name'] !== '' || count($cv['experience']) > 0);
     $first = $begun && $cv['name'] !== '' ? explode(' ', $cv['name'])[0] : '';
+    $nl = $lang === 'nl';
     $greeting = $begun
-        ? "Hi " . ($first ?: 'there') . ". I can see you've started your CV. I'll ask about anything that's missing, and you can skip whatever you like. You can also ask me questions about your CV along the way.\n\nWhat would you like to do first?"
-        : "Hi, I'm your Inkline interviewer. I'll ask a few easy questions and write your CV as we go. You can skip anything, ask me questions any time, or upload your old CV with the paperclip.\n\nFirst, what's your full name?";
+        ? ($nl
+            ? "Hoi" . ($first ? ' ' . $first : '') . ". Ik zie dat je al aan je cv bent begonnen. Ik vraag naar alles wat nog ontbreekt, en je kunt overslaan wat je wilt. Je kunt me onderweg ook vragen stellen over je cv.\n\nWaar wil je mee beginnen?"
+            : "Hi " . ($first ?: 'there') . ". I can see you've started your CV. I'll ask about anything that's missing, and you can skip whatever you like. You can also ask me questions about your CV along the way.\n\nWhat would you like to do first?")
+        : ($nl
+            ? "Hoi, ik ben je Inkline-interviewer. Ik stel een paar makkelijke vragen en schrijf je cv terwijl we praten. Je kunt alles overslaan, me altijd vragen stellen, of je oude cv uploaden met de paperclip.\n\nEerst: wat is je volledige naam?"
+            : "Hi, I'm your Inkline interviewer. I'll ask a few easy questions and write your CV as we go. You can skip anything, ask me questions any time, or upload your old CV with the paperclip.\n\nFirst, what's your full name?");
+    $quick = $begun ? ($nl ? ['De gaten invullen', 'Mijn formulering sterker maken', 'Een baan toevoegen'] : ['Fill in the gaps', 'Make my wording stronger', 'Add a job']) : [];
     $opener = '(The visitor has just opened Inkline and is ready to start.)' . ($begun ? "\nTheir CV so far:\n" . json_encode($cv, JSON_UNESCAPED_UNICODE) : '');
-    $assistant = json_encode(['reply' => $greeting, 'quick_replies' => $begun ? ['Fill in the gaps', 'Make my wording stronger', 'Add a job'] : [], 'stage' => 'basics',
+    $assistant = json_encode(['reply' => $greeting, 'quick_replies' => $quick, 'stage' => 'basics',
         'show_designs' => false, 'suggested_templates' => [], 'cv' => $cv ?: normalize_cv([])], JSON_UNESCAPED_UNICODE);
-    return ['greeting' => $greeting, 'quick_replies' => $begun ? ['Fill in the gaps', 'Make my wording stronger', 'Add a job'] : [],
+    return ['greeting' => $greeting, 'quick_replies' => $quick,
         'history' => [['role' => 'user', 'content' => $opener], ['role' => 'assistant', 'content' => $assistant]]];
 }
